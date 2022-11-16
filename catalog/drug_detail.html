@@ -1,0 +1,13 @@
+{%extends "base_generic.html" %}
+
+{% block content %}
+  <h1>Sample: {{ drug.sampleid }}</h1>
+
+  <p><strong>Sample ID:</strong> {{ drug.sampleid}}</p>
+  <p><strong>Patient ID:</strong> <a href="{% url "patient-detail" drug.patientid.pk %}">{{  drug.patientid.patientid }}</a>
+  <p><strong>Dasatinib LC50 nM :</strong> {{ drug.Dasatinib_LC50_nM}}</p>
+  <p><strong>Ventoclax LC50 nM :</strong> {{ drug.Venetoclax_LC50_nM }}</p>
+
+
+{% endblock %}
+

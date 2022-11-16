@@ -1,0 +1,13 @@
+{%extends "base_generic.html" %}
+
+{% block content %}
+  <h1>Patient: {{ patient.patientid }}</h1>
+
+  <p><strong>Patient ID:</strong> {{ patient.patientid }}</a></p> <!-- author detail link not yet defined -->
+  <p><strong>Gender:</strong> {{ patient.gender }}</p>
+  <p><strong>Age:</strong> {{ patient.age }}</p>
+  <p><strong>Race:</strong> {{ patient.race}}</p>
+  <p><strong>Status:</strong> {{ patient.status}}</p>
+
+  
+{% endblock %}

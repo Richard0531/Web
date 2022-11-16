@@ -1,0 +1,14 @@
+{%extends "base_generic.html" %}
+
+{% block content %}
+  <h1>Sample: {{ sampleid.pcgpid }}</h1>
+
+  <p><strong>Sample ID :</strong> {{ sampleid.pcgpid }}</p>
+  <p><strong>ID type :</strong>  {{  sampleid.id_type }}</p>
+  <p><strong>pharmgkbnumber :</strong> {{sampleid.pharmgkbnumber}}</p>
+  <p><strong>Patient ID :</strong> {{ sampleid.patientid }}</p>
+  <p><strong>Institution :</strong> {{ sampleid.institution }}</p>
+
+
+
+{% endblock %}

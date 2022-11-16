@@ -1,0 +1,29 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+{% load bootstrap3 %}
+
+  <h1>DMR Plot</h1>
+
+  <form method = 'GET' action = "{% url 'dmr-plot'%}">
+       
+        {{form.as_p}} 
+        <button> Submit </button>
+  </form>
+
+  
+<html>
+    <head>  
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/css/bootstrap.min.css" />
+    </head>
+    <body>
+     {% autoescape off %}
+        {{ plot_div }}
+     {% endautoescape %}
+    </body>    
+</html>
+
+
+
+{% endblock %}
+
