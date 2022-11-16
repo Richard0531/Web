@@ -39,27 +39,53 @@ import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 @login_required(login_url='/accounts/login/')
 def index(request):
-
-
-    
     context = {}
     return render(request, 'index.html', context=context)
-def sample_plot (request):     
-    lc50 = pd.read_parquet('static/LC50_plots.parquet',engine = 'pyarrow')
-    groups = request.GET.get('group')
-    group = 'status'
-    if groups:
-        group = groups
-    fig = px.histogram(
-        lc50,x = group, color = group
-    ,height=800
+@login_required(login_url='/accounts/login/')
+def sample (request):     
+    patient = pd.read_csv('static/Web_Patients.csv')
+    patient = patient.drop(columns = ['Unnamed: 0'])
+    app = DjangoDash('app_sample',external_stylesheets=[dbc.themes.BOOTSTRAP])
+    app.layout = html.Div([
+    dcc.Input(id='filter-query-input', debounce=True, placeholder='Enter filter query     "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and..."',style={'width':'1000px'} ),
+    dash_table.DataTable(
+          id='datatable-interactivity',
+          columns=[
+            {"name": i, "id": i, "deletable": False, "selectable": True,"hideable":True} for i in patient.columns
+            ],
+          data=patient.to_dict('records'),
+          editable=True,
+          filter_action="native",
+          sort_action="native",
+          sort_mode="multi",
+          row_deletable=True,
+          page_action="native",
+          page_current= 0,
+          page_size= 15,
+          hidden_columns=[],
+          export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
+          style_table={'overflowX': 'auto'},
+         style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220, 220, 220)'}],
+       style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'}
+          ),
+    html.Div(id='datatable-interactivity-container'),
+    ])
+    @app.callback(
+    Output('datatable-interactivity', 'filter_query'),
+    Input('filter-query-input', 'value')
     )
-    plots = plot(fig, output_type="div")
-
-
-    context = {'plot_div': plots,'form': SamplesForm}
-    
-    return render(request, 'catalog/sample_plol.html', context=context)
+    def write_query(query):
+        if query is None:
+            return ''
+        return query
+    @app.callback(
+    Output('datatable-interactivity-container', "children"),
+    Input('datatable-interactivity', "derived_filter_query_structure"),
+    )
+    def temp():
+        return
+    context = {}
+    return render(request, 'catalog/sample.html', context=context)
 
 
 @login_required(login_url='/accounts/login/')
