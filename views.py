@@ -9,7 +9,6 @@ import plotly.express as px
 import plotly.graph_objs as go
 from catalog.forms import *
 from catalog.choices import *
-from catalog.files import * 
 import numpy as np
 import dash_bio
 from django_filters.views import FilterView
@@ -38,17 +37,10 @@ import plotly.io as pio
 import pyarrow.parquet
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-pio.kaleido.scope.default_format = "svg"
 @login_required(login_url='/accounts/login/')
 def index(request):
-    """View function for home page of site."""
-
-    context = {
-    }
-
-    # Render the HTML template index.html with the data in the context variable
+    context = {}
     return render(request, 'index.html', context=context)
-@login_required(login_url='/accounts/login/')
 def sample_plot (request):     
     lc50 = pd.read_parquet('static/LC50_plots.parquet',engine = 'pyarrow')
     groups = request.GET.get('group')
@@ -107,310 +99,12 @@ def dmr_plot (request):
 
     # Render the HTML template index.html with the data in the context variable
     return render(request, 'catalog/dmr_plot.html', context=context)
+def dmp_plot(request):
+    return
+
 
 def lc50_plot(request):
     return
-@login_required(login_url='/accounts/login/')
-def dmp_plot (request):
-    dmp = DMP.objects.all()
-    chromosomes = request.GET.get('chromosome')
-
-    if chromosomes:
-        dmp = dmp.filter(chromosome = chromosomes) 
-    
-    project_data_dmp = [
-        {
-            'CHR' : x.chromosome,
-            'BP' : x.position,
-            'P': x.adjpvalue,
-            'SNP':x.name,
-            'ZSCORE':x.AveExpr,
-            'EFFECTSIZE':x.t,
-            'GENE':x.gene,
-            'DISTANCE':x.B
-        } for x in dmp
-    ]
-    df_dmp = pd.DataFrame(project_data_dmp['CHR'])
-    df_ 
-    df_dmp = pd.DataFrame(project_data_dmp)
-    df_dmp['CHR'] = pd.to_numeric(df_dmp['CHR'])
-    df_dmp['BP'] = pd.to_numeric(df_dmp['BP'])
-    df_dmp['P'] = pd.to_numeric(df_dmp['P'])
-    df_dmp['ZSCORE'] = pd.to_numeric(df_dmp['ZSCORE'])
-    df_dmp['EFFECTSIZE'] = pd.to_numeric(df_dmp['EFFECTSIZE'])
-    df_dmp['DISTANCE'] = pd.to_numeric(df_dmp['DISTANCE'])
-    fig_dmp = dash_bio.ManhattanPlot(dataframe=df_dmp)
-    man_plot_dmp = plot(fig_dmp,output_type="div", show_link=False, link_text="")
-    context = {
-        'plot_div': man_plot_dmp, 
-        'form':DMPForm()  
-    }
-    return render(request, 'catalog/dmp_plot.html', context=context)
-
-@login_required(login_url='/accounts/login/')
-def plots(request):
-    sample_list = sample_information.objects.all() 
-    print(type(sample_list))
-    form = RNAForm(request.POST,data_list=sample_list)
-    gene_parquet = pd.read_parquet('static/geneAnno.parquet',engine = 'pyarrow')
-    lc50 = pd.read_parquet('static/LC50_plots.parquet',engine = 'pyarrow')
-    pid = pd.read_parquet('static/sampleid.parquet',engine = 'pyarrow')    
-    df_plot = pd.DataFrame()
-    genes = request.POST.get('gene')
-    gene_types = request.POST.get('gene_type')
-    chromosomes = request.POST.get('chromosome')
-    drugs = request.POST.get('drug')
-    subtypes = request.POST.get('subtype')
-    
-    groups = request.POST.get('groups')
-    
-    group = 'status'
-    if genes:
-        df = pq.read_pandas('static/RNAseqT.parquet', columns = [genes]).to_pandas()
-        if drugs:
-            lc50 = lc50[((lc50['drug'] == drugs ) )] 
-        if subtypes:
-            lc50 = lc50[((lc50['subtype'] == subtypes ) )] 
-        if groups:
-            group = groups
-        df['pcgpids'] =list( pid.pcgpids)
-        df_plot = pd.merge(df, lc50,how='inner',on='pcgpids')
-        fig = px.violin(
-            df_plot,x = group, y = genes,points="all",box = True, color = group, hover_name = 'subtype'
-            ,title= drugs,height=1000
-            )
-        plots = plot(fig, output_type="div")
-        context = {'plot_div': plots,'form': form}
-
-    else:
-        context = {'form': form}
-    return render(request, 'catalog/plots.html',context)
-@login_required(login_url='/accounts/login/')
-def general(request):
-    sample_list = sample_information.objects.all()
-    form = FormForm(request.POST,data_list=sample_list)
-    X =  request.POST.get('x_axis')
-    Y =  request.POST.get('y_axis')
-    groups = request.POST.get('groups')
-    groups2 = request.POST.get('groups2')
-    drugs = request.POST.get('drugs')
-    pid = pd.read_parquet('static/sampleid.parquet',engine = 'pyarrow')
-    lc50 = pd.read_parquet('static/lc50_plot_category.parquet',engine = 'pyarrow')
-    if X: 
-        if X in lc50.columns:
-            if Y in lc50.columns:
-                fig = px.density_heatmap(lc50,x = X,y = Y,marginal_x = 'histogram',marginal_y='histogram',height=800)
-                plots = plot(fig, output_type="div",show_link = False,link_text="")
-                context = {'plot_div': plots,'form': form}
-            else:
-                df = pq.read_pandas('static/RNAseqT.parquet', columns = [Y]).to_pandas()
-                df['pcgpids'] =list( pid.pcgpids)
-                df_plot = pd.merge(df, lc50,how='inner',on='pcgpids')
-                fig = px.violin(df_plot,x = X, y = Y,box = True ,color = X,height=800)
-                plots = plot(fig, output_type="div")
-                context = {'plot_div': plots,'form': form}
-        else:
-            if Y in lc50.columns:
-                df = pq.read_pandas('static/RNAseqT.parquet', columns = [X]).to_pandas()
-                df['pcgpids'] =list( pid.pcgpids)
-                df_plot = pd.merge(df, lc50,how='inner',on='pcgpids')
-                fig = px.violin(df_plot,x = X, y = Y,box = True ,color = Y,height=800,)
-                plots = plot(fig, output_type="div")
-                context = {'plot_div': plots,'form': form}
-            else:
-                df = pq.read_pandas('static/RNAseqT.parquet', columns = [X,Y]).to_pandas()
-                df['pcgpids'] =list( pid.pcgpids)
-                lc50_drug = lc50[lc50['drug']==drugs]
-                df_plot = pd.merge(df, lc50_drug,how='inner',on='pcgpids')
-                if groups:
-                    group = groups
-                    if groups2:
-                        fig = px.scatter(df_plot,x = X, y = Y,trendline="ols",color = group, facet_col=groups2  ,marginal_x ='box',marginal_y ='box',height=800)
-                    else:
-                        fig = px.scatter(df_plot,x = X, y = Y,trendline="ols",color = group ,marginal_x ='box',marginal_y ='box',height=800)
-                else:
-                    fig = px.scatter(df_plot,x = X, y = Y,trendline="ols",marginal_x ='box',marginal_y ='box',height=800)
-                plots = plot(fig, output_type="div")
-                context = {'plot_div': plots,'form': form}
-    else:
-        context = {'form':form}
-    
-
-    return render(request, 'catalog/general.html',context)
-@login_required(login_url='/accounts/login/')
-def dashtest(request):
-    sample_list = sample_information.objects.all()
-    form = FormForm2(request.POST,data_list=sample_list)
-    X =  request.POST.get('x_axis') 
-    Y =  request.POST.get('y_axis')
-    pid = pd.read_parquet('static/pknumbers.parquet',engine = 'pyarrow')
-    lc50 = pd.read_parquet('static/lc50_plot_category2.parquet',engine = 'pyarrow')
-    cnv_del = pd.read_parquet('static/cnv_del.parquet',engine = 'pyarrow')
-    groups = request.POST.get('groups')
-    df_plot = pd.DataFrame()
-    if X:
-        if not X in lc50.columns:
-            if not Y in lc50.columns:
-                X = X.upper()
-                Y = Y.upper()
-                df = pq.read_pandas('static/RNAseqT.parquet', columns = [X,Y]).to_pandas()
-                df['pharmgkbnumber'] =list(pid.pharmgkbnumber )
-                df_plot = pd.merge(df, lc50,how='inner',on='pharmgkbnumber')
-                df_plot = df_plot.drop(columns=['id','PercentBlastsDay4','pcgpids','wentao_subtype','subtype_pre'])
-            else:
-                X = X.upper()
-                df = pq.read_pandas('static/RNAseqT.parquet', columns = [X]).to_pandas()
-                df['pharmgkbnumber'] =list( pid.pharmgkbnumber)
-                df_plot = pd.merge(df, lc50,how='inner',on='pharmgkbnumber')
-                df_plot = df_plot.drop(columns=['id','PercentBlastsDay4','pcgpids','wentao_subtype','subtype_pre'])
-        else:
-            if  not Y in lc50.columns:
-                Y = Y.upper()
-                df = pq.read_pandas('static/RNAseqT.parquet', columns = [Y]).to_pandas()
-                df['pharmgkbnumber'] =list( pid.pharmgkbnumber)
-                df_plot = pd.merge(df, lc50,how='inner',on='pharmgkbnumber')
-                df_plot = df_plot.drop(columns=['id','PercentBlastsDay4','pcgpids','wentao_subtype','subtype_pre'])
-            else:
-                df_plot = lc50
-                df_plot = df_plot.drop(columns=['id','PercentBlastsDay4','pcgpids','wentao_subtype','subtype_pre'])
-    app = DjangoDash('app1',external_stylesheets=[dbc.themes.BOOTSTRAP])
-    controls =  html.Div([
-            html.Div([
-            html.Div(children=[
-                dcc.Checklist(id='trendline',options=['Trendlines'],value='Trendlines')],style={'width': '25%', 'display': 'inline-block'}),
-            html.Div(children=[
-                dcc.Checklist(id='boxplot',options=['Boxplots'],value='Boxplots')],style={'width': '25%', 'display': 'inline-block'})
-                ]),
-            html.Div([
-                html.Div(children=[
-                html.Label('Drug'),
-                dcc.Dropdown(lc50['drug'].unique(),list(lc50['drug'].unique()), multi=True,id='drug-filter'),
-                html.Label('Age'),
-                dcc.Dropdown(lc50['age_group'].unique(),['AYA','Ped','Older','Ad','Missing'], multi=True,id='age-filter'),
-                html.Label('Lineage'),
-                dcc.Dropdown(lc50['lineage'].unique(),['T','B','U','Mixed'], multi=True,id='lineage-filter',),
-                html.Label('Status'),
-                dcc.Dropdown(lc50['status'].unique(),['sensitive','resistant'],multi=True,id='status-filter'),
-                html.Label('Disease Status'),
-                dcc.Dropdown(lc50['diseaseStatus'].unique(),['PRIMARY','RELAPSE','REFRACTORY'],multi=True,id='disease-filter',),
-                html.Label('Subtype'),
-                dcc.Dropdown(lc50['subtype'].unique(),list(lc50['subtype'].unique()), multi=True,id='subtype-filter',maxHeight=100,),
-                ],style={'width': '100%', 'display': 'inline-block'} )
-                ]),], style={'display': 'block'}, id='filters-container')            
-
-    app.layout = html.Div([
-        "Filters",
-        dcc.Dropdown(
-        id='filters',
-        options=[
-            {'label': 'Show', 'value': 'on'},
-            {'label': 'Hide', 'value': 'off'}
-        ],
-        clearable=False,
-        multi=False,
-        value='off',
-        style={'width': '80px'}
-    ),
-        dbc.Row([
-                 dbc.Col(dcc.Graph(id="indicator-graphic",config={"displaylogo": False,'toImageButtonOptions': {
-                                                                                       'format': 'svg', 'filename': 'custom_image',
-                                                                                       'height': 700,'width': 1000,'scale': 1 }}), md=8),
-                dbc.Col(controls, md=4), 
-                ]),
-    dash_table.DataTable(
-        id='datatable-interactivity',
-        columns=[
-            {"name": i, "id": i, "deletable": False, "selectable": True, "filter_options":{"case":"sensitive"},
-            "hideable":True} for i in df_plot.columns
-        ],
-        data=df_plot.to_dict('records'),
-        editable=True,
-        filter_action="native",
-        sort_action="native",
-        sort_mode="multi",
-        row_deletable=True,
-        page_action="native",
-        page_current= 0,
-        page_size= 10,
-        hidden_columns=['diseaseStatus','assay_type','rsquared'],
-        style_data={
-        'width':'10%'
-    },
-    ),
-    html.Div(id='datatable-interactivity-container')
-    ])
-    @app.callback(
-    Output(component_id='filters-container', component_property='style'),
-    [Input(component_id='filters', component_property='value')]
-    )
-    def show_hide (filters):
-        if filters == 'on':
-            return {'display': 'block'}
-        if filters  == 'off':
-            return {'display': 'none'}
-
-    @app.callback(Output('indicator-graphic', 'figure'), 
-                  Input('datatable-interactivity', "derived_virtual_data"),
-                  Input('drug-filter', 'value'),
-                  Input('age-filter', 'value'),
-                  Input('subtype-filter', 'value'),
-                  Input('status-filter', 'value'),
-                  Input('lineage-filter', 'value'),
-                  Input('disease-filter', 'value'),
-                  Input('trendline','value'),
-                  Input('boxplot','value'),
-                  )
-    def update_graph(rows,drug_filter,age_filter,subtype_filter,status_filter,lineage_filter,diseasestatus_filter,trendline,boxplot):
-        dfff =  pd.DataFrame(rows)
-        dff = dfff[dfff['pharmgkbnumber'.isin(df_plot)]]
-        dff = dff[dff['drug'].isin(drug_filter)]
-        dff = dff[dff['subtype'].isin(subtype_filter)]
-        dff = dff[dff['age_group'].isin(age_filter)]   
-        dff = dff[dff['status'].isin(status_filter)] 
-        dff = dff[dff['lineage'].isin(lineage_filter)]
-        dff = dff[dff['diseaseStatus'].isin( diseasestatus_filter)]
-        if X:
-            if X in lc50.columns:
-                if Y in lc50.columns:
-                    fig = px.histogram(dff, x=X, color = Y,height = 800)
-                else:
-                    fig = px.violin(dff,x = X, y = Y,points = 'all',box = True ,color = X,height=800) 
-            else:
-                if Y in lc50.columns:
-                    fig = px.violin(dff,x = X, y = Y,points = 'all',box = True ,color = Y,height=800,)
-                else:
-                    if groups:
-                        if 'Trendlines' in trendline:
-                            if 'Boxplots' in boxplot:
-                                fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,marginal_x ='box',marginal_y ='box',height = 800)
-                            else:
-                                fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,height = 800)
-                        else:
-                            if 'Boxplots' in boxplot:
-                                fig = px.scatter(dff, x=X, y=Y,color = groups,marginal_x ='box',marginal_y ='box',height = 800)
-                            else:
-                                fig = px.scatter(dff, x=X, y=Y,color = groups,height = 800)
-                    else:
-                        if 'Trendlines' in trendline:  
-                            if 'Boxplots' in boxplot:
-                                fig = px.scatter(dff, x=X, y=Y,trendline="ols" ,marginal_x ='box',marginal_y ='box',height = 800)
-                            else:
-                                fig = px.scatter(dff, x=X, y=Y,trendline="ols",height = 800)
-                        else:
-                            if 'Boxplots' in boxplot:
-                                fig = px.scatter(dff, x=X, y=Y ,marginal_x ='box',marginal_y ='box',height = 800)
-                            else:
-                                fig = px.scatter(dff, x=X, y=Y,height = 800)
-        fig.update_layout(
-                      width = 800,
-                      height = 600,
-                      autosize=True,
-                      template="plotly_white",
-                      )
-        return fig
-
-    context = {'form': form}
-    return render(request, 'catalog/app.html',context)
 @login_required(login_url='/accounts/login/')
 def sample_overview(request):
     df = pd.read_csv('static/Contrast_institution.csv').set_index('pharmgkbnumber')
@@ -456,12 +150,11 @@ def sample_overview(request):
 def overall (request):
     pid = pd.read_parquet('static/pknumbers.parquet',engine = 'pyarrow')
     lc50 = pd.read_csv('static/Web_LC50_newlc50.csv')
-    ###lc50 = lc50.drop(columns = ['Unnamed: 0'])
     patient = pd.read_csv('static/Web_Patients.csv')
-  
-    df_plot = patient.drop(columns = ['Unnamed: 0'])
+    ###lc50 = lc50.drop(columns = ['Unnamed: 0'])
     cnv = pd.read_parquet('static/cnv_del.parquet',engine = 'pyarrow')
     snv = pd.read_parquet('static/Web_snv_fillna.parquet',engine = 'pyarrow')
+    df_plot = patient.drop(columns = ['Unnamed: 0'])
     ###patient_lc50 = pd.merge(patient, lc50,how='inner',on='pharmgkbnumber')
     d =  pd.read_parquet('static/Web_dtype.parquet',engine = 'pyarrow')
     dropdown = pd.read_parquet('static/Web_dropdown_list.parquet',engine = 'pyarrow')
@@ -521,7 +214,7 @@ def overall (request):
                           'PercentBlastsDay4','assay_type','age_group'],
           export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
           style_table={'overflowX': 'auto'},
-         style_cell={'textOverflow': 'ellipsis'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220, 220, 220)'}], 
+         style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220, 220, 220)'}], 
        style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'}
     ,),
     html.Div(id='datatable-interactivity-container'),
@@ -638,12 +331,18 @@ def overall (request):
                 dff = dff.dropna(subset=[X,Y,groups]) 
                 if is_string_dtype(dff[X]):
                     if is_string_dtype(dff[Y]):
-                        fig = px.histogram(dff, x=X, color = Y,height = 800)
+                        fig = px.histogram(dff, x=X, color = Y,text_auto=True,height = 800)
                     else:
-                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = X,height=800) 
+                        if 'Boxplots' in boxplot:
+                            fig = px.violin(dff,x = X, y = Y,points = 'all',color = X,box=True,height=800) 
+                        else:
+                            fig = px.violin(dff,x = X, y = Y,points = 'all',color = X,height=800)
                 else:
                     if is_string_dtype(dff[Y]):
-                        fig = px.violin(dff,x = X, y = Y,color = Y,points = 'all',height=800)
+                        if 'Boxplots' in boxplot:
+                            fig = px.violin(dff,x = X, y = Y,color = Y,points = 'all',box=True,height=800)
+                        else:
+                            fig = px.violin(dff,x = X, y = Y,color = Y,points = 'all',box=True,height=800)
                     else:
                         if groups:
                             if 'Trendlines' in trendline:
@@ -704,12 +403,12 @@ def snv (request):
           row_deletable=True,
           page_action="native",
           page_current= 0,
-          page_size= 30,
+          page_size= 15,
           hidden_columns=snv.columns[10:],
           export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
-          style_data={
-          'width':'10%'
-          },
+          style_table={'overflowX': 'auto'},
+         style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220, 220, 220)'}],
+       style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'}
           ),
     html.Div(id='datatable-interactivity-container'),
     ])
@@ -750,12 +449,12 @@ def cnv (request):
           row_deletable=True,
           page_action="native",
           page_current= 0,
-          page_size= 30,
+          page_size= 15,
           hidden_columns=cnv.columns[9:273],
           export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
-          style_data={
-          'width':'10%'
-          },
+          style_table={'overflowX': 'auto'},
+         style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220, 220, 220)'}],
+       style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'}
           ),
     html.Div(id='datatable-interactivity-container'),
     ])
