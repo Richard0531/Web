@@ -39,6 +39,9 @@ import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 @login_required(login_url='/accounts/login/')
 def index(request):
+
+
+    
     context = {}
     return render(request, 'index.html', context=context)
 def sample_plot (request):     
