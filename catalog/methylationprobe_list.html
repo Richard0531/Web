@@ -1,0 +1,19 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+  <h1>Probes</h1>
+{% load render_table from django_tables2 %}
+
+<html>
+    <head>
+        <title>Probes</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" />
+    </head>
+    <body>
+        {% render_table table %}
+    </body>
+</html>
+
+{% endblock %}
+
+

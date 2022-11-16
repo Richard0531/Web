@@ -1,0 +1,22 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+  <h1>Sample counts</h1>
+  
+  <form method = "GET" action = "{% url 'sample-plot' %}">
+      {{ form.as_p }}
+
+      <button>Submit</button>
+  </form>
+
+  {% autoescape off %}
+        {{ plot_div }}
+  {% endautoescape %}
+
+</head>
+
+
+
+
+{% endblock %}
+
