@@ -86,6 +86,52 @@ def sample (request):
         return
     context = {}
     return render(request, 'catalog/sample.html', context=context)
+@login_required(login_url='/accounts/login/')
+def discovery(request):
+    dis = discovery.objects.all()
+    project_data_dis = [{"GeneSymbol": i.geneSymbol, "FuncType": i.funcType} for i in dis]
+    dis = pd.DataFrame(project_data_dis)
+    app = DjangoDash('app_discovery',external_stylesheets=[dbc.themes.BOOTSTRAP]) 
+    app.layout = html.Div([
+    dcc.Input(id='filter-query-input', debounce=True, placeholder='Enter filter query     "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and..."',style={'width':'1000px'} ),
+    dash_table.DataTable(
+          id='datatable-interactivity',
+          columns=[
+            {"name": i, "id": i, "deletable": False, "selectable": True,"hideable":True} for i in dis.columns
+            ],
+          data=dis.to_dict('records'),
+          editable=True,
+          filter_action="native",
+          sort_action="native",
+          sort_mode="multi",
+          row_deletable=True,
+          page_action="native",
+          page_current= 0,
+          page_size= 15,
+          hidden_columns=[],
+          export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
+          style_table={'overflowX': 'auto'},
+         style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220, 220, 220)'}],
+       style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'}
+          ),
+    html.Div(id='datatable-interactivity-container'),
+    ])
+    @app.callback(
+    Output('datatable-interactivity', 'filter_query'),
+    Input('filter-query-input', 'value')
+    )
+    def write_query(query):
+        if query is None:
+            return ''
+        return query
+    @app.callback(
+    Output('datatable-interactivity-container', "children"),
+    Input('datatable-interactivity', "derived_filter_query_structure"),
+    )
+    def temp():
+        return
+    context = {}
+    return render(request, 'catalog/discovery.html', context=context)
 
 
 @login_required(login_url='/accounts/login/')
@@ -181,15 +227,15 @@ def overall (request):
     lc50 = pd.read_csv('static/Web_LC50_newlc50.csv')
     patient = pd.read_csv('static/Web_Patients.csv')
     ###lc50 = lc50.drop(columns = ['Unnamed: 0'])
-    cnv = pd.read_parquet('static/cnv_del.parquet',engine = 'pyarrow')
+    cnv = pd.read_parquet('static/Web_cnv_del.parquet',engine = 'pyarrow')
     snv = pd.read_parquet('static/Web_snv_fillna.parquet',engine = 'pyarrow')
     df_plot = patient.drop(columns = ['Unnamed: 0'])
     ###patient_lc50 = pd.merge(patient, lc50,how='inner',on='pharmgkbnumber')
     d =  pd.read_parquet('static/Web_dtype.parquet',engine = 'pyarrow')
     dropdown = pd.read_parquet('static/Web_dropdown_list.parquet',engine = 'pyarrow')
     dropdown = list(dropdown.list)
-    
-    app = DjangoDash('app_overall',external_stylesheets=[dbc.themes.BOOTSTRAP])
+    app = DjangoDash('app_overall',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
+    app.css.append_css({ "external_url" : "/static/catalog/overall.css" })
     col = [
     {"label": i , "value": i } for i in dropdown
     ]
@@ -243,7 +289,7 @@ def overall (request):
                           'PercentBlastsDay4','assay_type','age_group'],
           export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
           style_table={'overflowX': 'auto'},
-         style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220, 220, 220)'}], 
+         style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'}], 
        style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'}
     ,),
     html.Div(id='datatable-interactivity-container'),
@@ -288,7 +334,7 @@ def overall (request):
                 rna['pharmgkbnumber'] =list(pid.pharmgkbnumber)
                 df = pd.merge(df, rna,how='inner',on='pharmgkbnumber')
             elif 'del' in value:           
-                cnv_del = cnv[[value,'timepoint_del','pharmgkbnumber']]
+                cnv_del = cnv[[value,'timepoint','pharmgkbnumber']]
                 df = pd.merge(df,cnv_del,how='left', on ='pharmgkbnumber')
             elif 'SNV' in value:
                 snv_target = snv[['pharmgkbnumber','timepoint',value]]
@@ -461,7 +507,7 @@ def snv (request):
     return render(request, 'catalog/snv.html',context)
 @login_required(login_url='/accounts/login/')
 def cnv (request):
-    cnv = pd.read_parquet('static/cnv_del.parquet',engine = 'pyarrow')
+    cnv = pd.read_parquet('static/Web_cnv_del.parquet',engine = 'pyarrow')
     app = DjangoDash('app_cnv',external_stylesheets=[dbc.themes.BOOTSTRAP])
     app.layout = html.Div([
     dcc.Input(id='filter-query-input', debounce=True, placeholder='Enter filter query     "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and..."',style={'width':'1000px'} ),
