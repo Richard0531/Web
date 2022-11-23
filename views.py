@@ -264,8 +264,8 @@ def overall (request):
             html.Div (children=[html.Button('Reset Table', id='reset-button', n_clicks=0)],style={ 'display': 'inline-block'})
             ]) 
     data_edit = html.Div([ 
-    html.Div (children=[dcc.Input(id='column-input',placeholder='Enter the column',debounce=True)],style={'width': '30%', 'display': 'inline-block'} ),
-    html.Div (children=[dcc.Input(id='from-input',placeholder='Enter the old value',debounce=True)],style={'width': '30%', 'display': 'inline-block'} ),
+    html.Div (children=[dcc.Input(id='column-input',placeholder='Enter the column',debounce=True)],style={'width': '20%', 'display': 'inline-block'} ),
+    html.Div (children=[dcc.Input(id='from-input',placeholder='Enter the old value',debounce=True)],style={'width': '20%', 'display': 'inline-block'} ),
     html.Div (children=[dcc.Input(id='to-input',placeholder='Enter the new value',debounce=True)],style={'width': '30%', 'display': 'inline-block'} ),
     ])
     app.layout = html.Div([
