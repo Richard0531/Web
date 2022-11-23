@@ -224,7 +224,7 @@ def sample_overview(request):
 @login_required(login_url='/accounts/login/')
 def overall (request):
     pid = pd.read_parquet('static/pknumbers.parquet',engine = 'pyarrow')
-    lc50 = pd.read_csv('static/Web_LC50_newlc50.csv')
+    lc50 = pd.read_csv('static/Web_Final_LC50.csv')
     patient = pd.read_csv('static/Web_Patients.csv')
     ###lc50 = lc50.drop(columns = ['Unnamed: 0'])
     cnv = pd.read_parquet('static/Web_cnv_del.parquet',engine = 'pyarrow')
@@ -254,6 +254,9 @@ def overall (request):
                 dcc.Checklist(id='Reverse',options=['Reverse'],value=''),
                 'groups',
                 dcc.Dropdown(plot_options,value = 'lineage',id='groups')],style={'width': '25%', 'display': 'inline-block'}),
+            html.Div(children=[
+                'Plots',
+                dcc.Dropdown(['Scatter','Histogram','Box','Violin','Default'],value = 'Default',id='plotting')],style={'width': '25%', 'display': 'inline-block'}),
                 ]),
                 ], style={'display': 'block'}, id='filters-container')
     table_control = html.Div([ 
