@@ -225,11 +225,11 @@ def sample_overview(request):
 def overall (request):
     pid = pd.read_parquet('static/pknumbers.parquet',engine = 'pyarrow')
     lc50 = pd.read_csv('static/Web_Final_LC50.csv')
-    patient = pd.read_csv('static/Web_Patients.csv')
+    patient = pd.read_csv('static/Web_Patient_Final.csv')
     ###lc50 = lc50.drop(columns = ['Unnamed: 0'])
     cnv = pd.read_parquet('static/Web_cnv_del.parquet',engine = 'pyarrow')
     snv = pd.read_parquet('static/Web_snv_fillna.parquet',engine = 'pyarrow')
-    df_plot = patient.drop(columns = ['Unnamed: 0'])
+    df_plot = patient.drop(columns={'Unnamed: 0'})
     ###patient_lc50 = pd.merge(patient, lc50,how='inner',on='pharmgkbnumber')
     d =  pd.read_parquet('static/Web_dtype.parquet',engine = 'pyarrow')
     dropdown = pd.read_parquet('static/Web_dropdown_list.parquet',engine = 'pyarrow')
@@ -245,15 +245,15 @@ def overall (request):
             html.Div(children=[
                 dcc.Checklist(id='trendline',options=['Trendlines'],value='Trendlines'),
                 'X axis',
-                dcc.Dropdown(plot_options,value = 'lineage',id='x-axis',),],style={'width': '25%', 'display': 'inline-block'}),
+                dcc.Dropdown(plot_options,value = 'Subtype',id='x-axis',),],style={'width': '25%', 'display': 'inline-block'}),
             html.Div(children=[
                 dcc.Checklist(id='boxplot',options=['Boxplots'],value='Boxplots'),
                 'Y axis',
-                dcc.Dropdown(plot_options,value = 'subtype_clean',id='y-axis'),],style={'width': '25%', 'display': 'inline-block'}),
+                dcc.Dropdown(plot_options,value = 'Subtype',id='y-axis'),],style={'width': '25%', 'display': 'inline-block'}),
             html.Div(children=[
                 dcc.Checklist(id='Reverse',options=['Reverse'],value=''),
                 'groups',
-                dcc.Dropdown(plot_options,value = 'lineage',id='groups')],style={'width': '25%', 'display': 'inline-block'}),
+                dcc.Dropdown(plot_options,value = 'Subtype',id='groups')],style={'width': '25%', 'display': 'inline-block'}),
             html.Div(children=[
                 'Plots',
                 dcc.Dropdown(['Scatter','Histogram','Box','Violin','Default'],value = 'Default',id='plotting')],style={'width': '25%', 'display': 'inline-block'}),
@@ -410,7 +410,7 @@ def overall (request):
                 dff = dff.dropna(subset=[X,Y,groups]) 
                 if is_string_dtype(dff[X]):
                     if is_string_dtype(dff[Y]):
-                        fig = px.histogram(dff, x=X, color = Y,text_auto=True,height = 800)
+                        fig = px.histogram(dff, x=X, color = Y,text_auto=True,height = 800).update_xaxes(categoryorder='total descending')
                     else:
                         if 'Boxplots' in boxplot:
                             fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = X,box=True,height=800) 
