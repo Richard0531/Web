@@ -298,6 +298,7 @@ def overall (request):
     html.Div(id='datatable-interactivity-container'),
     dbc.Row([dbc.Col(data_edit)]),
     dbc.Row([dbc.Col(controls)]),
+    dcc.Slider(750, 1350,marks={750:'Min',1000:'Default',1350:'Max'},id = 'slider-updatemode', value = 1000, updatemode='drag'),
     dcc.Graph(id="indicator-graphic",config={"displaylogo": False,'toImageButtonOptions': {
                                                                                        'format': 'svg', 'filename': 'custom_image',
                                                                                        'height': 700,'width': 1000,'scale': 1 }}),
@@ -395,10 +396,10 @@ def overall (request):
         
     @app.callback(
     Output('indicator-graphic', "figure"),
-    [Input('x-axis', 'value'),Input('y-axis', 'value'),Input('groups','value'),Input('trendline','value'),Input('boxplot','value'),Input('Reverse','value')],
+    [Input('x-axis', 'value'),Input('y-axis', 'value'),Input('groups','value'),Input('trendline','value'),Input('boxplot','value'),Input('Reverse','value'),Input('slider-updatemode','value')],
     Input('datatable-interactivity', "derived_virtual_data"),
     )
-    def update_graphs(X,Y,groups,trendline,boxplot,reverse,data):
+    def update_graphs(X,Y,groups,trendline,boxplot,reverse,slider,data):
         dff = pd.DataFrame(data)
         if 'Reverse' in reverse:
             XX = X
@@ -412,15 +413,15 @@ def overall (request):
                         fig = px.histogram(dff, x=X, color = Y,text_auto=True,height = 800)
                     else:
                         if 'Boxplots' in boxplot:
-                            fig = px.violin(dff,x = X, y = Y,points = 'all',color = X,box=True,height=800) 
+                            fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = X,box=True,height=800) 
                         else:
-                            fig = px.violin(dff,x = X, y = Y,points = 'all',color = X,height=800)
+                            fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = X,height=800)
                 else:
                     if is_string_dtype(dff[Y]):
                         if 'Boxplots' in boxplot:
-                            fig = px.violin(dff,x = X, y = Y,color = Y,points = 'all',box=True,height=800)
+                            fig = px.violin(dff,x = X, y = Y,color = Y,points = 'outliers',box=True,height=800)
                         else:
-                            fig = px.violin(dff,x = X, y = Y,color = Y,points = 'all',box=True,height=800)
+                            fig = px.violin(dff,x = X, y = Y,color = Y,points = 'outliers',box=True,height=800)
                     else:
                         if groups:
                             if 'Trendlines' in trendline:
@@ -445,8 +446,8 @@ def overall (request):
                                 else:
                                     fig = px.scatter(dff, x=X, y=Y,height = 800) 
                 fig.update_layout(
-                      width = 1000,
-                      height = 750,
+                      width = slider,
+                      height = slider-250,
                       autosize=True,
                       template="plotly_white",
                       )
