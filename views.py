@@ -243,22 +243,33 @@ def overall (request):
     controls =  html.Div([
             html.Div([
             html.Div(children=[
-                dcc.Checklist(id='trendline',options=['Trendlines'],value='Trendlines'),
                 'X axis',
                 dcc.Dropdown(plot_options,value = 'Subtype',id='x-axis',),],style={'width': '25%', 'display': 'inline-block'}),
             html.Div(children=[
-                dcc.Checklist(id='boxplot',options=['Boxplots'],value='Boxplots'),
                 'Y axis',
                 dcc.Dropdown(plot_options,value = 'Subtype',id='y-axis'),],style={'width': '25%', 'display': 'inline-block'}),
             html.Div(children=[
-                dcc.Checklist(id='Reverse',options=['Reverse'],value=''),
                 'groups',
-                dcc.Dropdown(plot_options,value = 'Subtype',id='groups')],style={'width': '25%', 'display': 'inline-block'}),
+                dcc.Dropdown(plot_options,value = '',id='groups')],style={'width': '25%', 'display': 'inline-block'}),
             html.Div(children=[
                 'Plots',
                 dcc.Dropdown(['Scatter','Histogram','Box','Violin','Default'],value = 'Default',id='plotting')],style={'width': '25%', 'display': 'inline-block'}),
                 ]),
                 ], style={'display': 'block'}, id='filters-container')
+    plot_control =  html.Div([
+            html.Div([
+            html.Div(children=[
+                dcc.Checklist(id='trendline',options=['Trendlines'],value=''),],style={'width': '7%', 'display': 'inline-block'}),
+            html.Div(children=[
+                dcc.Checklist(id='boxplot',options=['Boxplots'],value='Boxplots'),],style={'width': '7%', 'display': 'inline-block'}),
+            html.Div(children=[
+                dcc.Checklist(id='violin',options=['Violin'],value='Violin'),],style={'width': '7%', 'display': 'inline-block'}),
+            html.Div(children=[
+                dcc.Checklist(id='dot',options=['Dots'],value='Dots'),],style={'width': '7%', 'display': 'inline-block'}),
+            html.Div(children=[
+                dcc.Checklist(id='Reverse',options=['Reverse'],value=''),],style={'width': '7%', 'display': 'inline-block'}),
+                ]),
+                ], style={'display': 'block'}, id='check-container')
     table_control = html.Div([ 
             html.Div (children=[html.Button('Add Column', id='editing-columns-button', n_clicks=0)],style={'width': '92%', 'display': 'inline-block'}),
             html.Div (children=[html.Button('Reset Table', id='reset-button', n_clicks=0)],style={ 'display': 'inline-block'})
@@ -297,6 +308,7 @@ def overall (request):
     ,),
     html.Div(id='datatable-interactivity-container'),
     dbc.Row([dbc.Col(data_edit)]),
+    dbc.Row([dbc.Col(plot_control)]),
     dbc.Row([dbc.Col(controls)]),
     dcc.Slider(750, 1350,marks={750:'Min',1000:'Default',1350:'Max'},id = 'slider-updatemode', value = 1000, updatemode='drag'),
     dcc.Graph(id="indicator-graphic",config={"displaylogo": False,'toImageButtonOptions': {
@@ -396,10 +408,11 @@ def overall (request):
         
     @app.callback(
     Output('indicator-graphic', "figure"),
-    [Input('x-axis', 'value'),Input('y-axis', 'value'),Input('groups','value'),Input('trendline','value'),Input('boxplot','value'),Input('Reverse','value'),Input('slider-updatemode','value')],
+    [Input('x-axis', 'value'),Input('y-axis', 'value'),Input('groups','value'),Input('trendline','value'),Input('boxplot','value'),
+    Input('violin','value'),Input('dot','value'),Input('Reverse','value'),Input('slider-updatemode','value') ],
     Input('datatable-interactivity', "derived_virtual_data"),
     )
-    def update_graphs(X,Y,groups,trendline,boxplot,reverse,slider,data):
+    def update_graphs(X,Y,groups,trendline,boxplot,violin,dot,reverse,slider,data):
         dff = pd.DataFrame(data)
         if 'Reverse' in reverse:
             XX = X
@@ -413,17 +426,50 @@ def overall (request):
                         fig = px.histogram(dff, x=X, color = Y,text_auto=True,height = 800).update_xaxes(categoryorder='total descending')
                     else:
                         if 'Boxplots' in boxplot:
-                            fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = X,box=True,height=800) 
+                            if 'Violin' in violin:
+                                if 'Dots' in dot:
+                                    fig = px.violin(dff,x = X, y = Y,points = 'all',color = X,box=True) 
+                                else:
+                                    fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = X,box=True)
+                            else:
+                                if 'Dots' in dot:
+                                    fig = px.box(dff,x = X, y = Y,points = 'all',color = X)
+                                else:
+                                    fig = px.box(dff,x = X, y = Y,points = 'outliers',color = X)
                         else:
-                            fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = X,height=800)
+                            if 'Violin' in violin:
+                                if 'Dots' in dot:
+                                    fig = px.violin(dff,x = X, y = Y,points = 'all',color = X)
+                                else:
+                                    fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = X)
+                            else:
+                                if 'Dots' in dot:
+                                    fig = px.strip(dff,x = X, y = Y,color = X)
                 else:
                     if is_string_dtype(dff[Y]):
                         if 'Boxplots' in boxplot:
-                            fig = px.violin(dff,x = X, y = Y,color = Y,points = 'outliers',box=True,height=800)
+                            if 'Violin' in violin:
+                                if 'Dots' in dot:
+                                    fig = px.violin(dff,x = X, y = Y,points = 'all',color = Y,box=True)
+                                else:
+                                    fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = Y,box=True)
+                            else:
+                                if 'Dots' in dot:
+                                    fig = px.box(dff,x = X, y = Y,points = 'all',color = Y)
+                                else:
+                                    fig = px.box(dff,x = X, y = Y,points = 'outliers',color = Y)
                         else:
-                            fig = px.violin(dff,x = X, y = Y,color = Y,points = 'outliers',box=True,height=800)
+                            if 'Violin' in violin:
+                                if 'Dots' in dot:
+                                    fig = px.violin(dff,x = X, y = Y,points = 'all',color = Y)
+                                else:
+                                    fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = Y)
+                            else:
+                                if 'Dots' in dot:
+                                    fig = px.strip(dff,x = X, y = Y,color = Y)
+
                     else:
-                        if groups:
+                        if groups is not None:
                             if 'Trendlines' in trendline:
                                 if 'Boxplots' in boxplot:
                                     fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,marginal_x ='box',marginal_y ='box',height = 800)
