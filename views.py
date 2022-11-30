@@ -437,9 +437,9 @@ def overall (request):
                                     fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',box=True)
                             else:
                                 if 'Dots' in dot:
-                                    fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all',box=True)
+                                    fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all')
                                 else:
-                                    fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers',box=True)
+                                    fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers')
                         else:
                             if 'Violin' in violin:
                                 if 'Dots' in dot:
@@ -459,9 +459,9 @@ def overall (request):
                                     fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',box=True)
                             else:
                                 if 'Dots' in dot:
-                                    fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all',box=True)
+                                    fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all')
                                 else:
-                                    fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers',box=True)
+                                    fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers')
                         else:
                             if 'Violin' in violin:
                                 if 'Dots' in dot:
