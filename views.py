@@ -39,6 +39,10 @@ import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 @login_required(login_url='/accounts/login/')
 def index(request):
+    
+
+
+    
     context = {}
     return render(request, 'index.html', context=context)
 @login_required(login_url='/accounts/login/')
@@ -87,19 +91,17 @@ def sample (request):
     context = {}
     return render(request, 'catalog/sample.html', context=context)
 @login_required(login_url='/accounts/login/')
-def discovery(request):
-    dis = discovery.objects.all()
-    project_data_dis = [{"GeneSymbol": i.geneSymbol, "FuncType": i.funcType} for i in dis]
-    dis = pd.DataFrame(project_data_dis)
-    app = DjangoDash('app_discovery',external_stylesheets=[dbc.themes.BOOTSTRAP]) 
+def drug(request):
+    lc50 = pd.read_csv('static/Web_Final_LC50.csv')
+    app = DjangoDash('app_lc50',external_stylesheets=[dbc.themes.BOOTSTRAP])
     app.layout = html.Div([
     dcc.Input(id='filter-query-input', debounce=True, placeholder='Enter filter query     "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and..."',style={'width':'1000px'} ),
     dash_table.DataTable(
           id='datatable-interactivity',
           columns=[
-            {"name": i, "id": i, "deletable": False, "selectable": True,"hideable":True} for i in dis.columns
+            {"name": i, "id": i, "deletable": False, "selectable": True,"hideable":True} for i in lc50.columns
             ],
-          data=dis.to_dict('records'),
+          data=lc50.to_dict('records'),
           editable=True,
           filter_action="native",
           sort_action="native",
@@ -131,8 +133,98 @@ def discovery(request):
     def temp():
         return
     context = {}
-    return render(request, 'catalog/discovery.html', context=context)
+    return render(request, 'catalog/drug.html', context)
 
+@login_required(login_url='/accounts/login/')
+def discover(request):
+    dis = pd.read_csv('static/Web_Discovery.csv')
+    app = DjangoDash('app_discovery',external_stylesheets=[dbc.themes.BOOTSTRAP]) 
+    app.layout = html.Div([
+    dcc.Input(id='filter-query-input', debounce=True, placeholder='Enter filter query     "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and..."',style={'width':'1000px'} ),
+    dash_table.DataTable(
+          id='datatable-interactivity',
+          columns=[
+            {"name": i, "id": i, "deletable": False, "selectable": True,"hideable":True} for i in dis.columns
+            ],
+          data=dis.to_dict('records'),
+          editable=True,
+          filter_action="native",
+          sort_action="native",
+          sort_mode="multi",
+          row_deletable=True,
+          page_action="native",
+          page_current= 0,
+          page_size= 15,
+          hidden_columns=dis.columns[6:],
+          export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
+          style_table={'overflowX': 'auto'},
+         style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220, 220, 220)'}],
+       style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'}
+          ),
+    html.Div(id='datatable-interactivity-container'),
+    ])
+    @app.callback(
+    Output('datatable-interactivity', 'filter_query'),
+    Input('filter-query-input', 'value')
+    )
+    def write_query(query):
+        if query is None:
+            return ''
+        return query
+    @app.callback(
+    Output('datatable-interactivity-container', "children"),
+    Input('datatable-interactivity', "derived_filter_query_structure"),
+    )
+    def temp():
+        return
+    context = {}
+    return render(request, 'catalog/discover.html', context)
+@login_required(login_url='/accounts/login/')
+def screening (request):
+    screen = pd.read_parquet('static/Web_Screening.parquet')
+    app = DjangoDash('app_screen',external_stylesheets=[dbc.themes.BOOTSTRAP])
+    app.layout = html.Div([
+    dcc.Input(id='filter-query-input', debounce=True, placeholder='Enter filter query     "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and..."',style={'width':'1000px'} ),
+    dash_table.DataTable(
+          id='datatable-interactivity',
+          columns=[
+            {"name": i, "id": i, "deletable": False, "selectable": True,"hideable":True} for i in screen.columns
+            ],
+          data=screen.to_dict('records'),
+          editable=True,
+          filter_action="native",
+          sort_action="native",
+          sort_mode="multi",
+          row_deletable=True,
+          page_action="native",
+          page_current= 0,
+          page_size= 15,
+          hidden_columns=[],
+          export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
+          style_table={'overflowX': 'auto'},
+         style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220, 220, 220)'}],
+       style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'}
+          ),
+    html.Div(id='datatable-interactivity-container'),
+    ])
+
+
+    @app.callback(
+    Output('datatable-interactivity', 'filter_query'),
+    Input('filter-query-input', 'value')
+    )
+    def write_query(query):
+        if query is None:
+            return ''
+        return query
+    @app.callback(
+    Output('datatable-interactivity-container', "children"),
+    Input('datatable-interactivity', "derived_filter_query_structure"),
+    )
+    def temp():
+        return
+    context = {}
+    return render(request, 'catalog/screening.html',context)
 
 @login_required(login_url='/accounts/login/')
 def dmr_plot (request):
@@ -275,11 +367,6 @@ def overall (request):
             html.Div (children=[html.Button('Add Column', id='editing-columns-button', n_clicks=0)],style={'width': '92%', 'display': 'inline-block'}),
             html.Div (children=[html.Button('Reset Table', id='reset-button', n_clicks=0)],style={ 'display': 'inline-block'})
             ]) 
-    data_edit = html.Div([ 
-    html.Div (children=[dcc.Input(id='column-input',placeholder='Enter the column',debounce=True)],style={'width': '20%', 'display': 'inline-block'} ),
-    html.Div (children=[dcc.Input(id='from-input',placeholder='Enter the old value',debounce=True)],style={'width': '20%', 'display': 'inline-block'} ),
-    html.Div (children=[dcc.Input(id='to-input',placeholder='Enter the new value',debounce=True)],style={'width': '30%', 'display': 'inline-block'} ),
-    ])
     app.layout = html.Div([
         dcc.Input(id='filter-query-input', placeholder='Enter filter query     "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and..."',debounce=True,style={'width':'1000px'} ),
         html.Div([dcc.Dropdown(multi=False,placeholder='Enter data columns: ',id='editing-columns-name',style={'width':'50%'})]),
@@ -308,7 +395,6 @@ def overall (request):
        style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'}
     ,),
     html.Div(id='datatable-interactivity-container'),
-    dbc.Row([dbc.Col(data_edit)]),
     dbc.Row([dbc.Col(plot_control)]),
     dbc.Row([dbc.Col(controls)]),
     dcc.Slider(750, 1350,marks={750:'Min',1000:'Default',1350:'Max'},id = 'slider-updatemode', value = 1000, updatemode='drag'),
@@ -352,13 +438,10 @@ def overall (request):
                 df = pd.merge(df, rna,how='inner',on='pharmgkbnumber')
             elif 'del' in value:           
                 cnv_del = cnv[[value,'timepoint','pharmgkbnumber']]
-                df = pd.merge(df,cnv_del,how='left', on ='pharmgkbnumber')
+                df = pd.merge(df,cnv_del,how='inner', on ='pharmgkbnumber')
             elif 'SNV' in value:
                 snv_target = snv[['pharmgkbnumber','timepoint',value]]
-                df = pd.merge(df,snv_target,how='left', on ='pharmgkbnumber')
-            elif 'EDIT' in value:
-                if To != '': 
-                    df.loc[df[Column]== From ,Column] = To
+                df = pd.merge(df,snv_target,how='inner', on ='pharmgkbnumber')
             else:
                 df = df
           
