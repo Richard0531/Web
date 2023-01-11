@@ -317,11 +317,11 @@ def sample_overview(request):
 def overall (request):
     pid = pd.read_parquet('static/pknumbers.parquet',engine = 'pyarrow')
     lc50 = pd.read_csv('static/Web_Final_LC50.csv')
-    patient = pd.read_csv('static/Web_Patient_Final.csv')
+    df_plot = pd.read_csv('static/Web_Patient_Final.csv',index_col=0)
     ###lc50 = lc50.drop(columns = ['Unnamed: 0'])
     cnv = pd.read_parquet('static/Web_cnv_del.parquet',engine = 'pyarrow')
     snv = pd.read_parquet('static/Web_snv_fillna.parquet',engine = 'pyarrow')
-    df_plot = patient.drop(columns={'Unnamed: 0'})
+    ###df_plot = patient.drop(columns={'Unnamed: 0'})
     ###patient_lc50 = pd.merge(patient, lc50,how='inner',on='pharmgkbnumber')
     d =  pd.read_parquet('static/Web_dtype.parquet',engine = 'pyarrow')
     dropdown = pd.read_parquet('static/Web_dropdown_list.parquet',engine = 'pyarrow')
@@ -344,9 +344,6 @@ def overall (request):
             html.Div(children=[
                 'groups',
                 dcc.Dropdown(plot_options,value = 'Sex',id='groups')],style={'width': '25%', 'display': 'inline-block'}),
-            html.Div(children=[
-                'Plots',
-                dcc.Dropdown(['Scatter','Histogram','Box','Violin','Default'],value = 'Default',id='plotting')],style={'width': '25%', 'display': 'inline-block'}),
                 ]),
                 ], style={'display': 'block'}, id='filters-container')
     plot_control =  html.Div([
@@ -379,6 +376,7 @@ def overall (request):
           data=df_plot.to_dict('records'),
           editable=True,
           filter_action="native",
+          filter_options = {'case':'insensitive'},
           cell_selectable  = True,
           sort_action="native",
           sort_mode="multi",
@@ -417,15 +415,12 @@ def overall (request):
     @app.callback(
     [dash.dependencies.Output("datatable-interactivity", 'data'), dash.dependencies.Output("datatable-interactivity", "columns")],
     Input('editing-columns-button', 'n_clicks'),
-    Input('column-input', "value"),
-    Input('from-input', "value"),
-    Input('to-input', "value"),
     State('editing-columns-name', 'value'),
     State('datatable-interactivity', "derived_virtual_data"),
     State('datatable-interactivity', 'columns')
     )
 
-    def update_columns(n_clicks,Column,From,To,value,data,columns):        
+    def update_columns(n_clicks,value,data,columns):        
         d_target = d[[value]]
         df = pd.DataFrame(data)
         if n_clicks >0:
@@ -531,7 +526,7 @@ def overall (request):
                                     fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers')
                             else:
                                 if 'Dots' in dot:
-                                    fig = px.strip(dff,x = X, y = Y,color = groups) if groups != 'N/A' else px.strip(dff,x = X, y = Y,points = 'all')
+                                    fig = px.strip(dff,x = X, y = Y,color = groups) if groups != 'N/A' else px.strip(dff,x = X, y = Y)
                 else:
                     if is_string_dtype(dff[Y]):
                         if 'Boxplots' in boxplot:
@@ -553,7 +548,7 @@ def overall (request):
                                     fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers')
                             else:
                                 if 'Dots' in dot:
-                                    fig = px.strip(dff,x = X, y = Y,color = groups) if groups != 'N/A' else px.strip(dff,x = X, y = Y,points = 'all')
+                                    fig = px.strip(dff,x = X, y = Y,color = groups) if groups != 'N/A' else px.strip(dff,x = X, y = Y)
 
                     else:
                         if groups != 'N/A':
