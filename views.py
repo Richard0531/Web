@@ -362,10 +362,9 @@ def overall (request):
                 ], style={'display': 'block'}, id='check-container')
     table_control = html.Div([ 
             html.Div (children=[html.Button('Add Column', id='editing-columns-button', n_clicks=0)],style={'width': '92%', 'display': 'inline-block'}),
-            html.Div (children=[html.Button('Reset Table', id='reset-button', n_clicks=0)],style={ 'display': 'inline-block'})
             ]) 
     app.layout = html.Div([
-        dcc.Input(id='filter-query-input', placeholder='Enter filter query     "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and..."',debounce=True,style={'width':'1000px'} ),
+        dcc.Input(id='filter-query-input', placeholder='Enter filter query  "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and {column_name}=... "',debounce=True,style={'width':'1000px'} ),
         html.Div([dcc.Dropdown(multi=False,placeholder='Enter data columns: ',id='editing-columns-name',style={'width':'50%'})]),
         dbc.Row([dbc.Col(table_control)]),
         dash_table.DataTable(
