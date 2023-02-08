@@ -313,11 +313,11 @@ def sample_overview(request):
         return fig
     context = {}
     return render(request, 'catalog/drugoverview.html',context)
+
 @login_required(login_url='/accounts/login/')
 def overall (request):
     pid = pd.read_parquet('static/pknumbers.parquet',engine = 'pyarrow')
-    lc50 = pd.read_csv('static/Web_Final_LC50.csv')
-    df_plot = pd.read_csv('static/Web_Patient_Final.csv',index_col=0)
+    df_plot = pd.read_csv('static/Web_Patient_Final_with_SJ_LC50.csv',index_col=0)
     ###lc50 = lc50.drop(columns = ['Unnamed: 0'])
     cnv = pd.read_parquet('static/Web_cnv_del.parquet',engine = 'pyarrow')
     snv = pd.read_parquet('static/Web_snv_fillna.parquet',engine = 'pyarrow')
@@ -343,7 +343,7 @@ def overall (request):
                 dcc.Dropdown(plot_options,value = 'Subtype',id='y-axis'),],style={'width': '25%', 'display': 'inline-block'}),
             html.Div(children=[
                 'groups',
-                dcc.Dropdown(plot_options,value = 'Sex',id='groups')],style={'width': '25%', 'display': 'inline-block'}),
+                dcc.Dropdown(plot_options,value = 'N/A',id='groups')],style={'width': '25%', 'display': 'inline-block'}),
                 ]),
                 ], style={'display': 'block'}, id='filters-container')
     plot_control =  html.Div([
@@ -383,9 +383,7 @@ def overall (request):
           page_action="native",
           page_current= 0,
           page_size= 10,
-          hidden_columns=['protocol','accession','assay_start_date','sample_date','date_of_birth','diseaseStatus',
-                          'test_mnemonic','storage','blasts_qc','PercentBlasts','PercentBlastsPostFicoll',
-                          'PercentBlastsDay4','assay_type','age_group'],
+          hidden_columns=['institution','DiseaseStatus','AssayType','Original_LC50','Log10_LC50','Normalized_LC50','DataTimePoint','id_time'],
           export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
           style_table={'overflowX': 'auto'},
          style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'}], 
