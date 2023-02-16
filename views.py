@@ -323,8 +323,8 @@ def overall (request):
     snv = pd.read_parquet('static/Web_snv_fillna.parquet',engine = 'pyarrow')
     ###df_plot = patient.drop(columns={'Unnamed: 0'})
     ###patient_lc50 = pd.merge(patient, lc50,how='inner',on='pharmgkbnumber')
-    d =  pd.read_parquet('static/Web_dtype.parquet',engine = 'pyarrow')
-    dropdown = pd.read_parquet('static/Web_dropdown_list.parquet',engine = 'pyarrow')
+    d =  pd.read_csv('static/Web_dtype.csv',index_col=0)
+    dropdown = pd.read_parquet('static/Web_dropdown_list_nolc50.parquet',engine = 'pyarrow')
     dropdown = list(dropdown.list)
     app = DjangoDash('app_overall',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
     app.css.append_css({ "external_url" : "/static/catalog/overall.css" })
@@ -654,7 +654,7 @@ def cnv (request):
           page_action="native",
           page_current= 0,
           page_size= 15,
-          hidden_columns=cnv.columns[9:273],
+          hidden_columns=cnv.columns[9:270],
           export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
           style_table={'overflowX': 'auto'},
          style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220, 220, 220)'}],
@@ -680,6 +680,116 @@ def cnv (request):
         return
     context = {}
     return render(request, 'catalog/cnv.html',context)
+
+@login_required(login_url='/accounts/login/')
+def seg(request):
+    seg = pd.read_parquet('static/Web_seg.parquet',engine = 'pyarrow')
+    app = DjangoDash('app_seg',external_stylesheets=[dbc.themes.BOOTSTRAP])
+    app.layout = html.Div([
+    dcc.Input(id='filter-query-input', debounce=True, placeholder='Enter filter query     "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and..."',style={'width':'1000px'} ),
+    dash_table.DataTable(
+          id='datatable-interactivity',
+          columns=[
+            {"name": i, "id": i, "deletable": False, "selectable": True,"hideable":True} for i in seg.columns
+            ],
+          data=seg.to_dict('records'),
+          editable=True,
+          filter_action="native",
+          sort_action="native",
+          sort_mode="multi",
+          row_deletable=True,
+          page_action="native",
+          page_current= 0,
+          page_size= 15,
+  
+          export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
+          style_table={'overflowX': 'auto'},
+         style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220, 220, 220)'}],
+       style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'}
+          ),
+    html.Div(id='datatable-interactivity-container'),
+    ])
+    @app.callback(
+    Output('datatable-interactivity', 'filter_query'),
+    Input('filter-query-input', 'value')
+    )
+    def write_query(query):
+        if query is None:
+            return ''
+        return query
+    @app.callback(
+    Output('datatable-interactivity-container', "children"),
+    Input('datatable-interactivity', "derived_filter_query_structure"),
+    )
+    def temp():
+        return
+    context = {}
+    return render(request, 'catalog/segment.html',context)
+@login_required(login_url='/accounts/login/')
+def crispr(request):
+    mp = pd.read_csv('static/CRISPR_6MP_REH.csv')
+    app = DjangoDash('app_crispr',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
+    app.layout = html.Div([
+        dcc.Input(id='filter-query-input', placeholder='Enter filter query  "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and {column_name}=... "',debounce=True,style={'width':'1000px'} ),
+        html.Div([dcc.Dropdown(['6-MP','AraC','Daunorubicin','L-asparaginase','Maphosphamide','Methotrexate','Vincristine','Trametinib','Dasatinib'],'6-MP',id='drug-name',style={'width':'50%'})]),
+        dash_table.DataTable(
+          id='datatable-interactivity',
+          columns=[
+            {"name": i, "id": i, "deletable": False, "selectable": False,"hideable":True} for i in mp.columns
+            ],
+          data= mp.to_dict('records'),
+          editable=True,
+          filter_action="native",
+          filter_options = {'case':'insensitive'},
+          cell_selectable  = True,
+          sort_action="native",
+          sort_mode="multi",
+          row_deletable=True,
+          page_action="native",
+          page_current= 0,
+          page_size= 20,
+          export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
+          style_table={'overflowX': 'auto'},
+         style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'}], 
+       style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'}
+    ,),
+    html.Div(id='datatable-interactivity-container'),
+     ])
+    @app.callback(
+    [dash.dependencies.Output("datatable-interactivity", 'data'), dash.dependencies.Output("datatable-interactivity", "columns")],
+    Input('drug-name', 'value'),
+    State('datatable-interactivity', "derived_virtual_data"),
+    State('datatable-interactivity', 'columns')
+    )
+    def update_columns(drug,data,columns):        
+        if drug == '6-MP':
+            df = pd.read_csv('static/CRISPR_6MP_REH.csv')
+        elif drug == 'AraC':
+            df = pd.read_csv('static/CRISPR_AraC_REH.csv') 
+        elif drug == 'Daunorubicin':
+            df = pd.read_csv('static/CRISPR_Daunorubicin_REH.csv')
+        elif drug == 'L-asparaginase':
+            df = pd.read_csv('static/CRISPR_L_asparaginase_REH.csv')
+        elif drug == 'Maphosphamide':
+            df = pd.read_csv('static/CRISPR_Maphosphamide_REH.csv')
+        elif drug == 'Methotrexate':
+            df = pd.read_csv('static/CRISPR_Methotrexate_REH.csv')
+        elif drug == 'Trametinib':
+            df = pd.read_parquet('static/Web_Screening.parquet')
+            df = df[df['Drugs'].str.contains('Trametinib')]
+        elif drug == 'Dasatinib':
+            df = pd.read_parquet('static/Web_Screening.parquet')
+            df = df[df['Drugs'].str.contains('Dasatinib')]
+        else:
+            df = pd.read_csv('static/CRISPR_Vincristine_REH.csv')
+        columns = [
+            {"name": i, "id": i, "deletable": False, "selectable": True,"hideable":True} for i in df.columns
+            ]
+        data = df.to_dict('records')
+        return data,columns
+    context = {}
+    return render(request, 'catalog/crispr.html',context)
+
 
 
 from django.views import generic
