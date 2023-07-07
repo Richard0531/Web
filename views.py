@@ -342,8 +342,11 @@ def overall (request):
                 'Y axis',
                 dcc.Dropdown(plot_options,value = 'Subtype',id='y-axis'),],style={'width': '25%', 'display': 'inline-block'}),
             html.Div(children=[
-                'groups',
-                dcc.Dropdown(plot_options,value = 'N/A',id='groups')],style={'width': '25%', 'display': 'inline-block'}),
+                'group1',
+                dcc.Dropdown(plot_options,value = 'N/A',id='group1')],style={'width': '25%', 'display': 'inline-block'}),
+             html.Div(children=[
+                'group2',
+                dcc.Dropdown(plot_options,value = 'N/A',id='group2')],style={'width': '25%', 'display': 'inline-block'}),
                 ]),
                 ], style={'display': 'block'}, id='filters-container')
     plot_control =  html.Div([
@@ -463,7 +466,16 @@ def overall (request):
         plot_options.append('N/A')
         return plot_options
     @app.callback(
-    Output("groups", "options"),
+    Output("group1", "options"),
+    Input('datatable-interactivity', 'derived_virtual_data'),
+    )
+    def update__plot_options(data):
+        dfff = pd.DataFrame(data)
+        plot_options = list(dfff.columns)
+        plot_options.append('N/A')
+        return plot_options
+    @app.callback(
+    Output("group2", "options"),
     Input('datatable-interactivity', 'derived_virtual_data'),
     )
     def update__plot_options(data):
@@ -487,11 +499,11 @@ def overall (request):
         
     @app.callback(
     Output('indicator-graphic', "figure"),
-    [Input('x-axis', 'value'),Input('y-axis', 'value'),Input('groups','value'),Input('trendline','value'),Input('boxplot','value'),
+    [Input('x-axis', 'value'),Input('y-axis', 'value'),Input('group1','value'),Input('group2','value'),Input('trendline','value'),Input('boxplot','value'),
     Input('violin','value'),Input('dot','value'),Input('Reverse','value'),Input('slider-updatemode','value') ],
     Input('datatable-interactivity', "derived_virtual_data"),
     )
-    def update_graphs(X,Y,groups,trendline,boxplot,violin,dot,reverse,slider,data):
+    def update_graphs(X,Y,groups,group2,trendline,boxplot,violin,dot,reverse,slider,data):
         dff = pd.DataFrame(data)
         if 'Reverse' in reverse:
             XX = X
@@ -499,7 +511,14 @@ def overall (request):
             Y = XX
         if X:
             if Y:
-                dff = dff.dropna(subset=[X,Y,groups]) if groups != 'N/A' else dff.dropna(subset=[X,Y]) 
+                if groups != 'N/A' and group2 != 'N/A':
+                    dff = dff.dropna(subset=[X,Y,groups,group2])
+                elif groups != 'N/A' and group2 == 'N/A':
+                    dff = dff = dff.dropna(subset=[X,Y,groups])
+                elif groups == 'N/A' and group2 != 'N/A':
+                    dff = dff.dropna(subset=[X,Y,group2])
+                else:
+                    dff = dff.dropna(subset=[X,Y])
                 if is_string_dtype(dff[X]):
                     if is_string_dtype(dff[Y]):
                         fig = px.histogram(dff, x=X, color = Y,text_auto=True,height = 800).update_xaxes(categoryorder='total descending')
@@ -507,69 +526,134 @@ def overall (request):
                         if 'Boxplots' in boxplot:
                             if 'Violin' in violin:
                                 if 'Dots' in dot:
-                                    fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True)
+                                    if group2 != 'N/A':
+                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True)
+                                    else:
+                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True)
                                 else:
-                                    fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',box=True)
+                                    if group2 != 'N/A':
+                                        fig = px.violin(dff,x = X,y=Y,points='outliers',color=groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',box=True)
+                                    else:
+                                        fig = px.violin(dff,x = X,y=Y,points='outliers',color=groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',box=True)
                             else:
                                 if 'Dots' in dot:
-                                    fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all')
+                                    if group2 != 'N/A':
+                                        fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all')
+                                    else:
+                                        fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all')
                                 else:
-                                    fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers')
+                                    if group2 != 'N/A':
+                                        fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers')
+                                    else:
+                                        fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers')
                         else:
                             if 'Violin' in violin:
                                 if 'Dots' in dot:
-                                    fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all')
+                                    if group2 != 'N/A':
+                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all')
+                                    else:
+                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all')
                                 else:
-                                    fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers')
+                                    if group2 != 'N/A':
+                                        fig = px.violin(dff,x=X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers')
+                                    else:
+                                        fig = px.violin(dff,x=X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers')
                             else:
                                 if 'Dots' in dot:
-                                    fig = px.strip(dff,x = X, y = Y,color = groups) if groups != 'N/A' else px.strip(dff,x = X, y = Y)
+                                    if  group2 != 'N/A':
+                                        fig = px.strip(dff,x = X, y = Y,color = groups,symbol=group2) if groups != 'N/A' else px.strip(dff,x = X, y = Y,symbol=group2)
+                                    else:
+                                        fig = px.strip(dff,x = X, y = Y,color = groups) if groups != 'N/A' else px.strip(dff,x = X, y = Y)
                 else:
                     if is_string_dtype(dff[Y]):
                         if 'Boxplots' in boxplot:
                             if 'Violin' in violin:
                                 if 'Dots' in dot:
-                                    fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True)
+                                    if group2 != 'N/A':
+                                        fig = px.violin(dff,x=X,y=Y,points='all',color=groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True)
+                                    else:
+                                        fig = px.violin(dff,x=X,y=Y,points='all',color=groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True)
                                 else:
-                                    fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',box=True)
+                                    if group2 != 'N/A':
+                                        fig = px.violin(dff,x=X,y=Y,points='outliers',color=groups,box=True) if groups != 'N/A' else px.violin(dff,x=X,y=Y,points='outliers',box=True)
+                                    else:
+                                        fig = px.violin(dff,x=X,y=Y,points='outliers',color=groups,box=True) if groups != 'N/A' else px.violin(dff,x=X,y=Y,points='outliers',box=True)
                             else:
                                 if 'Dots' in dot:
-                                    fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all')
+                                    if group2 != 'N/A':
+                                        fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all')
+                                    else:
+                                        fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all')
                                 else:
-                                    fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers')
+                                    if group2 != 'N/A':
+                                        fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers')
+                                    else:
+                                        fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers')
                         else:
                             if 'Violin' in violin:
                                 if 'Dots' in dot:
-                                    fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all')
+                                    if group2 != 'N/A':
+                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all')
+                                    else:
+                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all')
                                 else:
-                                    fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers')
+                                    if group2 != 'N/A':
+                                        fig = px.violin(dff,x = X, y=Y,points = 'outliers',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers')
+                                    else:
+                                        fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers')
                             else:
                                 if 'Dots' in dot:
-                                    fig = px.strip(dff,x = X, y = Y,color = groups) if groups != 'N/A' else px.strip(dff,x = X, y = Y)
-
+                                    if group2 != 'N/A':
+                                        fig = px.strip(dff,x = X, y = Y,color = groups,symbol=group2) if groups != 'N/A' else px.strip(dff,x = X, y = Y,symbol=group2)
+                                    else:
+                                        fig = px.strip(dff,x = X, y = Y,color = groups) if groups != 'N/A' else px.strip(dff,x = X, y = Y)
                     else:
                         if groups != 'N/A':
                             if 'Trendlines' in trendline:
                                 if 'Boxplots' in boxplot:
-                                    fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,marginal_x ='box',marginal_y ='box',height = 800)
+                                    if group2 != 'N/A':
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,symbol=group2,marginal_x ='box',marginal_y ='box',height = 800)
+                                    else:
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,marginal_x ='box',marginal_y ='box',height = 800)
                                 else:
-                                    fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,height = 800)
+                                    if group2 != 'N/A':
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,symbol=group2,height = 800)
+                                    else:
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,height = 800)
                             else:
                                 if 'Boxplots' in boxplot:
-                                    fig = px.scatter(dff, x=X, y=Y,color = groups,marginal_x ='box',marginal_y ='box',height = 800)
+                                    if group2 != 'N/A':
+                                        fig = px.scatter(dff, x=X, y=Y,color = groups,symbol=group2,marginal_x ='box',marginal_y ='box',height = 800)
+                                    else:
+                                        fig = px.scatter(dff, x=X, y=Y,color = groups,marginal_x ='box',marginal_y ='box',height = 800)
                                 else:
-                                    fig = px.scatter(dff, x=X, y=Y,color = groups,height = 800)
+                                    if group2 != 'N/A':
+                                        fig = px.scatter(dff, x=X, y=Y,color = groups,symbol=group2,height = 800)
+                                    else:
+                                        fig = px.scatter(dff, x=X, y=Y,color = groups,height = 800)
                         else:
                             if 'Trendlines' in trendline:  
                                 if 'Boxplots' in boxplot:
-                                    fig = px.scatter(dff, x=X, y=Y,trendline="ols" ,marginal_x ='box',marginal_y ='box',height = 800)
+                                    if group2 != 'N/A':
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color=group2 ,marginal_x ='box',marginal_y ='box',height = 800)
+                                    else:
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols" ,marginal_x ='box',marginal_y ='box',height = 800)
                                 else:
-                                    fig = px.scatter(dff, x=X, y=Y,trendline="ols",height = 800)
+                                    if group2 != 'N/A':
+                                        fig = px.scatter(dff, x=X, y=Y,color=group2,trendline="ols",height = 800)
+                                    else:
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",height = 800)
                             else:
                                 if 'Boxplots' in boxplot:
-                                    fig = px.scatter(dff, x=X, y=Y ,marginal_x ='box',marginal_y ='box',height = 800)
+                                    if group2 != 'N/A':
+                                        fig = px.scatter(dff, x=X, y=Y,color=group2 ,marginal_x ='box',marginal_y ='box',height = 800)
+                                    else:
+                                        fig = px.scatter(dff, x=X, y=Y ,marginal_x ='box',marginal_y ='box',height = 800)
                                 else:
-                                    fig = px.scatter(dff, x=X, y=Y,height = 800) 
+                                    if group2 != 'N/A':
+                                        fig = px.scatter(dff, x=X, y=Y,color=group2,height = 800)
+                                    else:
+                                        fig = px.scatter(dff, x=X, y=Y,height = 800) 
                 fig.update_layout(
                       width = slider,
                       height = slider-250,
@@ -721,17 +805,17 @@ def seg(request):
     Output('datatable-interactivity-container', "children"),
     Input('datatable-interactivity', "derived_filter_query_structure"),
     )
-    def temp():
-        return
+    def temp(value):
+        return value
     context = {}
     return render(request, 'catalog/segment.html',context)
 @login_required(login_url='/accounts/login/')
 def crispr(request):
-    mp = pd.read_csv('static/CRISPR_6MP_REH.csv')
+    mp = pd.read_csv('static/CRISPR_ALL_REH.csv',index_col = 0)
     app = DjangoDash('app_crispr',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
     app.layout = html.Div([
         dcc.Input(id='filter-query-input', placeholder='Enter filter query  "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and {column_name}=... "',debounce=True,style={'width':'1000px'} ),
-        html.Div([dcc.Dropdown(['6-MP','AraC','Daunorubicin','L-asparaginase','Maphosphamide','Methotrexate','Vincristine','Trametinib','Dasatinib'],'6-MP',id='drug-name',style={'width':'50%'})]),
+        html.Div([dcc.Dropdown(['6-MP','AraC','Daunorubicin','L-asparaginase','Maphosphamide','Methotrexate','Vincristine','Trametinib','Dasatinib','ALL'],'ALL',id='drug-name',style={'width':'50%'})]),
         dash_table.DataTable(
           id='datatable-interactivity',
           columns=[
@@ -773,15 +857,18 @@ def crispr(request):
         elif drug == 'Maphosphamide':
             df = pd.read_csv('static/CRISPR_Maphosphamide_REH.csv')
         elif drug == 'Methotrexate':
-            df = pd.read_csv('static/CRISPR_Methotrexate_REH.csv')
+            df = pd.read_csv('static/CRISPR_Methotrexate_REH2.csv',index_col = 0)
         elif drug == 'Trametinib':
             df = pd.read_parquet('static/Web_Screening.parquet')
             df = df[df['Drugs'].str.contains('Trametinib')]
         elif drug == 'Dasatinib':
             df = pd.read_parquet('static/Web_Screening.parquet')
             df = df[df['Drugs'].str.contains('Dasatinib')]
+        elif drug == 'Vincristine':
+            df = pd.read_csv('static/CRISPR_Vincristine_REH2.csv',index_col = 0)
         else:
-            df = pd.read_csv('static/CRISPR_Vincristine_REH.csv')
+            df = pd.read_csv('static/CRISPR_ALL_REH.csv',index_col = 0)
+
         columns = [
             {"name": i, "id": i, "deletable": False, "selectable": True,"hideable":True} for i in df.columns
             ]
