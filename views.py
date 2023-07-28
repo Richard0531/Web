@@ -37,6 +37,9 @@ import plotly.io as pio
 import pyarrow.parquet
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
+import base64
+import datetime
+import io
 @login_required(login_url='/accounts/login/')
 def index(request):
     
@@ -876,7 +879,177 @@ def crispr(request):
         return data,columns
     context = {}
     return render(request, 'catalog/crispr.html',context)
+@login_required(login_url='/accounts/login/')
+def image(request):
+    
+    app = DjangoDash('app_image',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
+    app.layout = html.Div([
+        dcc.Upload(
+            id='upload-data',
+            children=html.Div([
+                html.A('Select Files')
+            ]),
+            style={
+            'width': '30%',
+            'height': '30px',
+            'lineHeight': '30px',
+            'borderWidth': '1px',
+            'borderStyle': 'solid',
+            'borderRadius': '5px',
+            'textAlign': 'center',
+            'margin': '2px'
+            },
+            multiple=True
+        ),
+        dcc.Upload(
+            id='upload-image',
+            children=html.Div([
+                html.A('Select Image')
+            ]),
+            style={
+            'width': '30%',
+            'height': '30px',
+            'lineHeight': '30px',
+            'borderWidth': '1px',
+            'borderStyle': 'solid',
+            'borderRadius': '5px',
+            'textAlign': 'center',
+            'margin': '2px'
+            },
+            multiple=True
+        ),
+        html.Div(id='output-image-upload'),
+        html.Div(id='output-data-upload'),
+        ])
+    def parse_contents(contents, filename, date):
+        content_type, content_string = contents.split(',')        
+        decoded = base64.b64decode(content_string)
+        try:
+            if 'csv' in filename:
+                df = pd.read_csv(
+                    io.StringIO(decoded.decode('utf-8')))
+                df['Status'] = ''
+                df['color'] = ''
+                for i in range(len(df)):
+                    if df.iat[i,6] == 0:
+                        df.iat[i,18] = 'Normal'
+                        df.iat[i,19] = '1'
+                    elif df.iat[i,8] < 0.0001:
+                        df.iat[i,18] = 'Drug Interaction'
+                        df.iat[i,19] = '2'
+                    elif df.iat[i,10] < 9500:
+                        df.iat[i,18] = 'Peeling'
+                        df.iat[i,19] = '3'
+                    elif df.iat[i,10] > 9500:
+                        if df.iat[i,9] < 0.9:
+                            df.iat[i,18] = 'Peeling'
+                            df.iat[i,19] = '3'
+                        else:
+                            df.iat[i,18] = 'Drug Interaction'
+                            df.iat[i,19] = '2'
+                    else:
+                        df.iat[i,18] = 'Drug Interaction'
+                        df.iat[i,19] = '2'
+                fig = px.imshow(df.pivot('Row', 'Column', 'color'),color_continuous_scale="Blues")
+                fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Status'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
+                fig.update_traces(dict(showscale=False, coloraxis=None,colorscale='Blues'))
+                fig.update_layout(
+                    xaxis=dict( ticks='', showgrid=True, zeroline=False, nticks=20 ),
+                    yaxis=dict( ticks='', showgrid=True, zeroline=False, nticks=20 ),
+                    autosize=False,
+                    height=550,
+                    width=962.5,
+                    hovermode='closest',
+                    )
+            elif 'xls' in filename:
+                df = pd.read_excel(io.BytesIO(decoded))
+                df['Status'] = '' 
+                df['color'] = ''
+                for i in range(len(df)):
+                    if df.iat[i,6] == 0:
+                        df.iat[i,18] = 'Normal'
+                        df.iat[i,19] = '1'
+                    elif df.iat[i,8] < 0.0001:
+                        df.iat[i,18] = 'Drug Interaction'
+                        df.iat[i,19] = '2'
+                    elif df.iat[i,10] < 9500:
+                        df.iat[i,18] = 'Peeling'
+                        df.iat[i,19] = '3'
+                    elif df.iat[i,10] > 9500:
+                        if df.iat[i,9] < 0.9:
+                            df.iat[i,18] = 'Peeling'
+                            df.iat[i,19] = '3'
+                        else:
+                            df.iat[i,18] = 'Drug Interaction'
+                            df.iat[i,19] = '2'
+                    else:
+                        df.iat[i,18] = 'Drug Interaction'
+                        df.iat[i,19] = '2'
+                fig = px.imshow(df.pivot('Row', 'Column', 'color'),color_continuous_scale="Blues")
+                fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Status'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
+                fig.update_traces(dict(showscale=False, coloraxis=None,colorscale='Blues'))
+                fig.update_layout(
+                    xaxis=dict( ticks='', showgrid=True, zeroline=True, nticks=20 ),
+                    yaxis=dict( ticks='', showgrid=True, zeroline=False, nticks=20 ),
+                    autosize=False,
+                    height=550,
+                    width=962.5,
+                    hovermode='closest',
+                    )
+        except Exception as e:
+            print(e)
+            return html.Div([
+                'There was an error processing this file.'
+            ])
+        return   html.Div([
+            html.H5(filename),
+            dcc.Graph(id="graph-basic-2", figure=fig, clear_on_unhover=True,config={"displaylogo": False}),
+            dcc.Tooltip(id="graph-tooltip"),
+            dash_table.DataTable(
+                df.to_dict('records'),
+                [{'name': i, 'id': i,"hideable":True} for i in df.columns],
+                page_size= 10,
+                filter_action="native",
+                filter_options = {'case':'insensitive'},
+                sort_action="native",
+                sort_mode="multi",
+                page_action="native",
+                hidden_columns=df.columns[[0,1,4,5,7,9,10,12,13,16,17,19]],
+                export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
+                style_table={'overflowX': 'auto'},
+                style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'}],
+                style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+            ),
 
+            ])
+    @app.callback(Output('output-data-upload', 'children'),
+              Input('upload-data', 'contents'),
+              State('upload-data', 'filename'),
+              State('upload-data', 'last_modified'))
+    def update_output(list_of_contents, list_of_names, list_of_dates):
+        if list_of_contents is not None:
+            children = [
+                parse_contents(c, n, d) for c, n, d in
+                zip(list_of_contents, list_of_names, list_of_dates)]
+            return children
+    def image_contents(contents, filename, date):
+        return html.Div([
+            html.H5(filename),
+            html.Img(src=contents),
+            html.Hr(),
+        ])
+    @app.callback(Output('output-image-upload', 'children'),
+              Input('upload-image', 'contents'),
+              State('upload-image', 'filename'),
+              State('upload-image', 'last_modified'))
+    def update_image(list_of_contents, list_of_names, list_of_dates):
+        if list_of_contents is not None:
+            children = [
+                image_contents(c, n, d) for c, n, d in
+                zip(list_of_contents, list_of_names, list_of_dates)]
+            return children
+    context = {}
+    return render(request, 'catalog/image.html',context)    
 
 
 from django.views import generic
