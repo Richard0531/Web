@@ -919,9 +919,10 @@ def image(request):
             multiple=True
         ),
         html.Div(id='output-image-upload'),
+        html.Div(id="output-plot-upload"),
         html.Div(id='output-data-upload'),
         ])
-    def parse_contents(contents, filename, date):
+    def parse_contents(contents, filename,date):
         content_type, content_string = contents.split(',')        
         decoded = base64.b64decode(content_string)
         try:
@@ -950,17 +951,6 @@ def image(request):
                     else:
                         df.iat[i,18] = 'Drug Interaction'
                         df.iat[i,19] = '2'
-                fig = px.imshow(df.pivot('Row', 'Column', 'color'),color_continuous_scale="Blues")
-                fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Status'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
-                fig.update_traces(dict(showscale=False, coloraxis=None,colorscale='Blues'))
-                fig.update_layout(
-                    xaxis=dict( ticks='', showgrid=True, zeroline=False, nticks=20 ),
-                    yaxis=dict( ticks='', showgrid=True, zeroline=False, nticks=20 ),
-                    autosize=False,
-                    height=550,
-                    width=962.5,
-                    hovermode='closest',
-                    )
             elif 'xls' in filename:
                 df = pd.read_excel(io.BytesIO(decoded))
                 df['Status'] = '' 
@@ -985,47 +975,34 @@ def image(request):
                     else:
                         df.iat[i,18] = 'Drug Interaction'
                         df.iat[i,19] = '2'
-                fig = px.imshow(df.pivot('Row', 'Column', 'color'),color_continuous_scale="Blues")
-                fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Status'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
-                fig.update_traces(dict(showscale=False, coloraxis=None,colorscale='Blues'))
-                fig.update_layout(
-                    xaxis=dict( ticks='', showgrid=True, zeroline=True, nticks=20 ),
-                    yaxis=dict( ticks='', showgrid=True, zeroline=False, nticks=20 ),
-                    autosize=False,
-                    height=550,
-                    width=962.5,
-                    hovermode='closest',
-                    )
         except Exception as e:
             print(e)
             return html.Div([
                 'There was an error processing this file.'
-            ])
+                ])
         return   html.Div([
             html.H5(filename),
-            dcc.Graph(id="graph-basic-2", figure=fig, clear_on_unhover=True,config={"displaylogo": False}),
-            dcc.Tooltip(id="graph-tooltip"),
             dash_table.DataTable(
-                df.to_dict('records'),
-                [{'name': i, 'id': i,"hideable":True} for i in df.columns],
-                page_size= 10,
-                filter_action="native",
-                filter_options = {'case':'insensitive'},
-                sort_action="native",
-                sort_mode="multi",
-                page_action="native",
-                hidden_columns=df.columns[[0,1,4,5,7,9,10,12,13,16,17,19]],
-                export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
-                style_table={'overflowX': 'auto'},
-                style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'}],
-                style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
-            ),
+                    df.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in df.columns],
+                    page_size= 10,
+                    filter_action="native",
+                    filter_options = {'case':'insensitive'},
+                    sort_action="native",
+                    sort_mode="multi",
+                    page_action="native",
+                    hidden_columns=df.columns[[0,1,4,5,7,9,10,12,13,16,17,19]],
+                    export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
+                    style_table={'overflowX': 'auto'},
+                    style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'}],
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                ),
 
-            ])
+                ])
     @app.callback(Output('output-data-upload', 'children'),
               Input('upload-data', 'contents'),
               State('upload-data', 'filename'),
-              State('upload-data', 'last_modified'))
+              State('upload-data','last_modified'))
     def update_output(list_of_contents, list_of_names, list_of_dates):
         if list_of_contents is not None:
             children = [
@@ -1035,7 +1012,7 @@ def image(request):
     def image_contents(contents, filename, date):
         return html.Div([
             html.H5(filename),
-            html.Img(src=contents),
+            html.Img(src=contents, height =656,width = 1148 ),
             html.Hr(),
         ])
     @app.callback(Output('output-image-upload', 'children'),
@@ -1048,6 +1025,132 @@ def image(request):
                 image_contents(c, n, d) for c, n, d in
                 zip(list_of_contents, list_of_names, list_of_dates)]
             return children
+    def plot_contents(table_contents, table_filename, table_date,img_contents,img_filename,img_date ):
+        table_content_type, table_content_string = table_contents.split(',')        
+        decoded = base64.b64decode(table_content_string)
+        if 'csv' in table_filename:
+            df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+            df['Status'] = ''
+            df['color'] = ''
+            for i in range(len(df)):
+                if df.iat[i,6] == 0:
+                    df.iat[i,18] = 'Normal'
+                    df.iat[i,19] = '1'
+                elif df.iat[i,8] < 0.0001:
+                    df.iat[i,18] = 'Drug Interaction'
+                    df.iat[i,19] = '2'
+                elif df.iat[i,10] < 9500:
+                    df.iat[i,18] = 'Peeling'
+                    df.iat[i,19] = '3'
+                elif df.iat[i,10] > 9500:
+                    if df.iat[i,9] < 0.9:
+                        df.iat[i,18] = 'Peeling'
+                        df.iat[i,19] = '3'
+                    else:
+                        df.iat[i,18] = 'Drug Interaction'
+                        df.iat[i,19] = '2'
+                else:
+                    df.iat[i,18] = 'Drug Interaction'
+                    df.iat[i,19] = '2'
+        elif 'xls' in table_filename:
+            df = pd.read_excel(io.BytesIO(decoded))
+            df['Status'] = '' 
+            df['color'] = ''
+            for i in range(len(df)):
+                if df.iat[i,6] == 0:
+                    df.iat[i,18] = 'Normal'
+                    df.iat[i,19] = '1'
+                elif df.iat[i,8] < 0.0001:
+                    df.iat[i,18] = 'Drug Interaction'
+                    df.iat[i,19] = '2'
+                elif df.iat[i,10] < 9500:
+                    df.iat[i,18] = 'Peeling'
+                    df.iat[i,19] = '3'
+                elif df.iat[i,10] > 9500:
+                    if df.iat[i,9] < 0.9:
+                        df.iat[i,18] = 'Peeling'
+                        df.iat[i,19] = '3'
+                    else:
+                        df.iat[i,18] = 'Drug Interaction'
+                        df.iat[i,19] = '2'
+                else:
+                    df.iat[i,18] = 'Drug Interaction'
+                    df.iat[i,19] = '2'
+            fig = px.imshow(df.pivot('Row', 'Column', 'color'),color_continuous_scale="Blues")
+            fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Status'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
+            fig.update_traces(dict(showscale=False, coloraxis=None,colorscale='Blues'))
+            fig.update_layout(height=820,width=1443.75,)
+            ###fig.add_vline(x=3.5),fig.add_vline(x=4.5),fig.add_vline(x=5.5),fig.add_vline(x=6.5),fig.add_vline(x=7.5),fig.add_vline(x=8.5),fig.add_vline(x=9.5)
+            ###fig.add_vline(x=10.5),fig.add_vline(x=11.5),fig.add_vline(x=12.5),fig.add_vline(x=1.5),fig.add_vline(x=12.5),fig.add_vline(x=13.5),fig.add_vline(x=14.5),
+            ###fig.add_vline(x=15.5),fig.add_vline(x=16.5),fig.add_vline(x=17.5),fig.add_vline(x=18.5),fig.add_vline(x=19.5),fig.add_vline(x=20.5),fig.add_vline(x=21.5),
+            ###fig.add_vline(x=22.5)
+            ###fig.add_hline(y=1.5),fig.add_hline(y=2.5),fig.add_hline(y=3.5),fig.add_hline(y=4.5),fig.add_hline(y=5.5),fig.add_hline(y=6.5),fig.add_hline(y=7.5),fig.add_hline(y=8.5),
+            ###fig.add_hline(y=9.5),fig.add_hline(y=0.5),fig.add_hline(y=10.5)
+            fig.add_shape(type="rect",x0=2.5,y0=-0.5,x1=3.5,y1=5.5)
+            fig.add_annotation(x=3, y=-1.5,text='Control',showarrow=False,)
+            fig.add_shape(type="rect",x0=3.5,y0=-0.5,x1=5.5,y1=5.5)
+            fig.add_annotation(x=4.5, y=-1.5,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 4), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=5.5,y0=-0.5,x1=7.5,y1=5.5)
+            fig.add_annotation(x=6.5, y=-1.5,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 6), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=7.5,y0=-0.5,x1=9.5,y1=5.5)
+            fig.add_annotation(x=8.5, y=-1.5,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 8), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=9.5,y0=-0.5,x1=11.5,y1=5.5)
+            fig.add_annotation(x=10.5, y=-1.5,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 10), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=11.5,y0=-0.5,x1=13.5,y1=5.5)
+            fig.add_annotation(x=12.5, y=-1.5,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 12), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=13.5,y0=-0.5,x1=15.5,y1=5.5)
+            fig.add_annotation(x=14.5, y=-1.5,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 14), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=15.5,y0=-0.5,x1=17.5,y1=5.5)
+            fig.add_annotation(x=16.5, y=-1.5,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 16), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=17.5,y0=-0.5,x1=19.5,y1=5.5)
+            fig.add_annotation(x=18.5, y=-1.5,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 18), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=19.5,y0=-0.5,x1=21.5,y1=5.5)
+            fig.add_annotation(x=20.5, y=-1.5,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 20), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=21.5,y0=-0.5,x1=23.5,y1=5.5)
+            fig.add_annotation(x=22.5, y=-1.5,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 22), 'Compound'].values[0],showarrow=False,) 
+            fig.add_shape(type="rect",x0=2.5,y0=5.5,x1=3.5,y1=11.5)
+            fig.add_annotation(x=3, y=12.5,text='Control',showarrow=False,)
+            fig.add_shape(type="rect",x0=3.5,y0=5.5,x1=5.5,y1=11.5)
+            fig.add_annotation(x=4.5, y=12.5,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 4), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=5.5,y0=5.5,x1=7.5,y1=11.5)
+            fig.add_annotation(x=6.5, y=12.5,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 6), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=7.5,y0=5.5,x1=9.5,y1=11.5)
+            fig.add_annotation(x=8.5, y=12.5,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 8), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=9.5,y0=5.5,x1=11.5,y1=11.5)
+            fig.add_annotation(x=10.5, y=12.5,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 10), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=11.5,y0=5.5,x1=13.5,y1=11.5)
+            fig.add_annotation(x=12.5, y=12.5,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 12), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=13.5,y0=5.5,x1=15.5,y1=11.5)
+            fig.add_annotation(x=14.5, y=12.5,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 14), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=15.5,y0=5.5,x1=17.5,y1=11.5)
+            fig.add_annotation(x=16.5, y=12.5,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 16), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=17.5,y0=5.5,x1=19.5,y1=11.5)
+            fig.add_annotation(x=18.5, y=12.5,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 18), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=19.5,y0=5.5,x1=21.5,y1=11.5)
+            fig.add_annotation(x=20.5, y=12.5,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 20), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=21.5,y0=5.5,x1=23.5,y1=11.5)
+            fig.add_annotation(x=22.5, y=12.5,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 22), 'Compound'].values[0],showarrow=False,)
+            fig.add_shape(type="rect",x0=2.5,y0=5.5,x1=3.5,y1=11.5)
+            fig.add_layout_image(dict(source="https://raw.githubusercontent.com/michaelbabyn/plot_data/master/naphthalene.png",x=0.9,y='O',))
+        return html.Div([
+            dcc.Graph(id="indicator-graphic", figure=fig, clear_on_unhover=True,config={"displaylogo": False}),
+            ])
+    @app.callback(
+        Output("output-plot-upload", 'children'),
+        Input('upload-data', 'contents'),
+        Input('upload-image', 'contents'),
+        State('upload-data', 'filename'),
+        State('upload-data', 'last_modified'),
+        State('upload-image', 'filename'),
+        State('upload-image', 'last_modified'),
+        )
+    def plot_graph(table_contents,img_contents, table_names, table_dates, img_filename,img_last_modified):
+        if table_contents is not None:
+            if img_contents is not None:
+                children = [plot_contents(c, n, d, cc, nn, dd) for c, n, d, cc, nn, dd in 
+                    zip(table_contents, table_names, table_dates,img_contents,img_filename,img_last_modified)]
+                return children
+
     context = {}
     return render(request, 'catalog/image.html',context)    
 
