@@ -1059,11 +1059,34 @@ def image(request):
                 fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * 10 ) - (image.shape[0] /24)),text='M',showarrow=False,)
                 fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * 11 ) - (image.shape[0] /24)),text='N',showarrow=False,)
                 fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * 12 ) - (image.shape[0] /24)),text='O',showarrow=False,)
+                fig.add_shape(type="rect",x0=0,y0=0,x1=((image.shape[1] /21) * 1) ,y1=image.shape[0] /2,line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 1),y0=0,x1=((image.shape[1] /21) * 3) ,y1=image.shape[0] /2,line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 3),y0=0,x1=((image.shape[1] /21) * 5) ,y1=image.shape[0] /2,line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 5),y0=0,x1=((image.shape[1] /21) * 7) ,y1=image.shape[0] /2,line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 7),y0=0,x1=((image.shape[1] /21) * 9) ,y1=image.shape[0] /2,line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 9),y0=0,x1=((image.shape[1] /21) * 11) ,y1=image.shape[0] /2,line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 11),y0=0,x1=((image.shape[1] /21) * 13) ,y1=image.shape[0] /2,line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 13),y0=0,x1=((image.shape[1] /21) * 15) ,y1=image.shape[0] /2,line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 15),y0=0,x1=((image.shape[1] /21) * 17) ,y1=image.shape[0] /2,line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 17),y0=0,x1=((image.shape[1] /21) * 19) ,y1=image.shape[0] /2,line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 19),y0=0,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0] /2,line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=0,y0=image.shape[0] /2,x1=((image.shape[1] /21) * 1) ,y1=image.shape[0],line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 1),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 3) ,y1=image.shape[0],line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 3),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 5) ,y1=image.shape[0],line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 5),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 7) ,y1=image.shape[0],line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 7),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 9) ,y1=image.shape[0],line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 9),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 11) ,y1=image.shape[0],line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 11),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 13) ,y1=image.shape[0],line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 13),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 15) ,y1=image.shape[0],line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 15),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 17) ,y1=image.shape[0],line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 17),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 19) ,y1=image.shape[0],line=dict(color="White",width=2,))
+                fig.add_shape(type="rect",x0=((image.shape[1] /21) * 19),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0],line=dict(color="White",width=2,))
                 fig.update_layout(dragmode='drawrect',newshape=dict(line_color='cyan'))
                 fig.update_traces(hoverinfo='none',hovertemplate=None)
                 fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
-                return fig 
+                return fig
         return {'data': [], 'layout': go.Layout()}
+        
         #if list_of_contents is not None:
          #   children = [
           #      image_contents(c, n) for c, n,  in
