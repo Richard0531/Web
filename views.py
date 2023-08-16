@@ -41,6 +41,7 @@ import base64
 import datetime
 import io
 import cv2
+import numpy as np
 @login_required(login_url='/accounts/login/')
 def index(request):
     
@@ -958,7 +959,9 @@ def image(request):
         df = pd.merge(df1, df2, how='left', on='ID')
         df['Status'] = ''
         for i in range(len(df)):
-            if df.at[i,'Whole Image Population - Peeling Factor-2'] < 0.0001:
+            if np.isnan(df.at[i,'Whole Image Population - Empty Ratio-2']):
+                df.at[i,'Status'] = 'Normal'
+            elif df.at[i,'Whole Image Population - Peeling Factor-2'] < 0.0001:
                 df.at[i,'Status'] = 'Drug Interaction'
             else:
                 df.at[i,'Status'] = 'Peeling'
@@ -966,18 +969,28 @@ def image(request):
         summary_table['Normal'] = 9-summary_table['Drug Interaction'] - summary_table['Peeling']
         summary_table = summary_table.reset_index()
         df_plate = pd.merge(df3, summary_table, how='left', on='Well ID')
+        df_plate['Well Result'] = ''
         df_plate['Status'] = ''
         df_plate['Color'] = ''
         for i in range(len(df_plate)):
             if df_plate.at[i,'Peeling'] > 4:
                 df_plate.at[i,'Status'] = 'Fail'
-                df_plate.at[i,'Color'] = '3'
             else:
                 df_plate.at[i,'Status'] = 'Pass'
+        for i in range(len(df_plate)):
+            if df_plate.at[i,'Peeling'] > 0:
+                df_plate.at[i,'Well Result'] = 'Peeling'
+                df_plate.at[i,'Color'] = '3'
+            elif df_plate.at[i,'Drug Interaction'] > 0:
+                df_plate.at[i,'Well Result'] = 'Drug Interaction'
                 df_plate.at[i,'Color'] = '2'
-        
+            else:
+                df_plate.at[i,'Well Result'] = 'Normal'
+                df_plate.at[i,'Color'] = '1'
+        df_plate['FOV']= 'Normal: '+ df_plate['Normal'].astype(str) + '\n' + 'DI: ' + df_plate['Drug Interaction'].astype(str) + '\n' + 'Peeling: ' + df_plate['Peeling'].astype(str)
+        df_plate['FOV']=df_plate['FOV'] + '\n' + 'Well Result: ' + df_plate['Well Result'].astype(str)
         fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),color_continuous_scale="Blues")
-        fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'Status'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
+        fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'FOV'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>FOV: %{customdata}<br><extra></extra>'}])
         return html.Div([
             dcc.Graph(id="indicator-graphic", figure=fig, clear_on_unhover=True,config={"displaylogo": False}),
             dash_table.DataTable(
@@ -1004,6 +1017,7 @@ def image(request):
                     sort_action="native",
                     sort_mode="multi",
                     page_action="native",
+                    hidden_columns=['Color','FOV'],
                     #hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
                     export_format='xlsx',export_headers='display',
                     style_table={'overflowX': 'auto'},
@@ -1085,7 +1099,6 @@ def image(request):
           #      image_contents(c, n) for c, n,  in
            #     zip(list_of_contents, list_of_names)]
             #return children
-
     context = {}
     return render(request, 'catalog/image.html',context)    
 
