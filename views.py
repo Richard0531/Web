@@ -920,8 +920,7 @@ def image(request):
             },
             multiple=True
         ),
-        dcc.Graph(id='output-image-upload', clear_on_unhover=True,config={"displaylogo": False,'modeBarButtonsToAdd':['zoom2d','drawopenpath','drawrect', 'eraseshape','resetViews','resetGeo'],
-                                                                           'doubleClick': 'reset' }),
+        dcc.Graph(id='output-image-upload', clear_on_unhover=True,config={"displaylogo": False, 'modeBarButtonsToAdd':['zoom2d','drawopenpath','drawrect', 'eraseshape','resetViews','resetGeo'], }),
         html.Div(id="output-plot-upload"),
         html.Div(id='output-data-upload'),
         ])
@@ -936,7 +935,9 @@ def image(request):
                 df['color'] = ''
                 if 'Hole Significance' in df.columns:
                     df['Hole Status'] = ''
-                    df['Hole Status'] = df['Hole Significance'] * df['Hole Factor'] 
+                    df['Hole Status'] = df['Hole Significance'] * df['Hole Factor']
+                else:
+                    df['Hole Status'] = 999
                 for i in range(len(df)):
                     if df.at[i,'Drug Interaction FOV - Number of Objects'] == 0:
                         df.at[i,'Status'] = 'Normal'
@@ -945,12 +946,20 @@ def image(request):
                         df.at[i,'Status'] = 'Drug Interaction'
                         df.at[i,'color'] = '2'
                     elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] < 9500:
-                        df.at[i,'Status'] = 'Peeling'
-                        df.at[i,'color'] = '3'
-                    elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] > 9500:
-                        if df.at[i,'Empty Ratio'] < 0.9:
+                        if df.at[i,'Hole Status'] < 0.4:
+                            df.at[i,'Status'] = 'Drug Interaction'
+                            df.at[i,'color'] = '2'
+                        else:
                             df.at[i,'Status'] = 'Peeling'
                             df.at[i,'color'] = '3'
+                    elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] > 9500:
+                        if df.at[i,'Empty Ratio'] < 0.9:
+                            if df.at[i,'Hole Status'] < 0.4:
+                                df.at[i,'Status'] = 'Drug Interaction'
+                                df.at[i,'color'] = '2'
+                            else:
+                                df.at[i,'Status'] = 'Peeling'
+                                df.at[i,'color'] = '3'
                         else:
                             df.at[i,'Status'] = 'Drug Interaction'
                             df.at[i,'color'] = '2'
@@ -964,6 +973,8 @@ def image(request):
                 if 'Hole Significance' in df.columns:
                     df['Hole Status'] = ''
                     df['Hole Status'] = df['Hole Significance'] * df['Hole Factor']
+                else:
+                    df['Hole Status'] = 999
                 for i in range(len(df)):
                     if df.at[i,'Drug Interaction FOV - Number of Objects'] == 0:
                         df.at[i,'Status'] = 'Normal'
@@ -972,18 +983,30 @@ def image(request):
                         df.at[i,'Status'] = 'Drug Interaction'
                         df.at[i,'color'] = '2'
                     elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] < 9500:
-                        df.at[i,'Status'] = 'Peeling'
-                        df.at[i,'color'] = '3'
-                    elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] > 9500:
-                        if df.at[i,'Empty Ratio'] < 0.9:
+                        if df.at[i,'Hole Status'] < 0.4:
+                            df.at[i,'Status'] = 'Drug Interaction'
+                            df.at[i,'color'] = '2'
+                        else:
                             df.at[i,'Status'] = 'Peeling'
                             df.at[i,'color'] = '3'
+                    elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] > 9500:
+                        if df.at[i,'Empty Ratio'] < 0.9:
+                            if df.at[i,'Hole Status'] < 0.4:
+                                df.at[i,'Status'] = 'Drug Interaction'
+                                df.at[i,'color'] = '2'
+                            else:
+                                df.at[i,'Status'] = 'Peeling'
+                                df.at[i,'color'] = '3'
                         else:
                             df.at[i,'Status'] = 'Drug Interaction'
                             df.at[i,'color'] = '2'
                     else:
                         df.at[i,'Status'] = 'Drug Interaction'
                         df.at[i,'color'] = '2'
+            else:
+                df = pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9) 
+                df.rename(columns={df.columns[-1]: 'Status'}, inplace=True)
+                                       
         except Exception as e:
             print(e)
             return html.Div([
@@ -1000,7 +1023,7 @@ def image(request):
                     sort_action="native",
                     sort_mode="multi",
                     page_action="native",
-                    hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
+                    #hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
                     export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
                     style_table={'overflowX': 'auto'},
                     style_cell={'height': 'auto','overflow': 'hidden','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'}],
@@ -1031,15 +1054,16 @@ def image(request):
         #])
     @app.callback(Output('output-image-upload', 'figure'),
               Input('upload-image', 'contents'),
-              #State('upload-image', 'filename'),
+              State('upload-image', 'filename'),
               )
-    def update_image(list_of_contents):
+    def update_image(list_of_contents,list_of_filename):
         if list_of_contents is not None:
             contents = list_of_contents[-1]
+            filenames = list_of_filename[-1]
             image = image_contents(contents)
             fig = go.Figure()
             if image is not None:
-                fig = px.imshow(image,height = 738,width=1291.5)
+                fig = px.imshow(image,height = 738,width=1291.5,title = filenames)
                 fig.update_xaxes(showticklabels=False)
                 fig.update_yaxes(showticklabels=False)
                 fig.add_annotation(x=(((image.shape[1] /21) * 1 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='3',showarrow=False,)
@@ -1081,7 +1105,6 @@ def image(request):
                 fig.add_shape(type="rect",x0=((image.shape[1] /21) * 15),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 17) ,y1=image.shape[0],line=dict(color="Grey",width=3,))
                 fig.add_shape(type="rect",x0=((image.shape[1] /21) * 17),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 19) ,y1=image.shape[0],line=dict(color="Grey",width=3,))
                 fig.add_shape(type="rect",x0=((image.shape[1] /21) * 19),y0=image.shape[0] /2,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0],line=dict(color="Grey",width=3,))
-                fig.update_layout(dragmode='drawrect',newshape=dict(line_color='cyan'))
                 fig.update_traces(hoverinfo='none',hovertemplate=None)
                 fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
                 return fig
@@ -1102,6 +1125,8 @@ def image(request):
             if 'Hole Significance' in df.columns:
                     df['Hole Status'] = ''
                     df['Hole Status'] = df['Hole Significance'] * df['Hole Factor']
+            else:
+                    df['Hole Status'] = 999
             for i in range(len(df)):
                 if df.at[i,'Drug Interaction FOV - Number of Objects'] == 0:
                     df.at[i,'Status'] = 'Normal'
@@ -1110,12 +1135,20 @@ def image(request):
                     df.at[i,'Status'] = 'Drug Interaction'
                     df.at[i,'color'] = '2'
                 elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] < 9500:
-                    df.at[i,'Status'] = 'Peeling'
-                    df.at[i,'color'] = '3'
-                elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] > 9500:
-                    if df.at[i,'Empty Ratio'] < 0.9:
+                    if df.at[i,'Hole Status'] < 0.4:
+                        df.at[i,'Status'] = 'Drug Interaction'
+                        df.at[i,'color'] = '2'
+                    else:
                         df.at[i,'Status'] = 'Peeling'
                         df.at[i,'color'] = '3'
+                df.at[i,'Status'] = 'Drug Interaction'elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] > 9500:
+                    if df.at[i,'Empty Ratio'] < 0.9:
+                        if df.at[i,'Hole Status'] < 0.4:
+                            df.at[i,'Status'] = 'Drug Interaction'
+                            df.at[i,'color'] = '2'
+                        else:
+                            df.at[i,'Status'] = 'Peeling'
+                            df.at[i,'color'] = '3'
                     else:
                         df.at[i,'Status'] = 'Drug Interaction'
                         df.at[i,'color'] = '2'
@@ -1129,6 +1162,8 @@ def image(request):
             if 'Hole Significance' in df.columns:
                     df['Hole Status'] = ''
                     df['Hole Status'] = df['Hole Significance'] * df['Hole Factor']
+            else:
+                    df['Hole Status'] = 999
             for i in range(len(df)):
                 if df.at[i,'Drug Interaction FOV - Number of Objects'] == 0:
                     df.at[i,'Status'] = 'Normal'
@@ -1137,20 +1172,27 @@ def image(request):
                     df.at[i,'Status'] = 'Drug Interaction'
                     df.at[i,'color'] = '2'
                 elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] < 9500:
-                    df.at[i,'Status'] = 'Peeling'
-                    df.at[i,'color'] = '3'
-                elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] > 9500:
-                    if df.at[i,'Empty Ratio'] < 0.9:
+                    if df.at[i,'Hole Status'] < 0.4:
+                        df.at[i,'Status'] = 'Drug Interaction'
+                        df.at[i,'color'] = '2'
+                    else:
                         df.at[i,'Status'] = 'Peeling'
                         df.at[i,'color'] = '3'
+                elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] > 9500:
+                    if df.at[i,'Empty Ratio'] < 0.9:
+                        if df.at[i,'Hole Status'] < 0.4:
+                            df.at[i,'Status'] = 'Drug Interaction'
+                            df.at[i,'color'] = '2'
+                        else:
+                            df.at[i,'Status'] = 'Peeling'
+                            df.at[i,'color'] = '3'
                     else:
                         df.at[i,'Status'] = 'Drug Interaction'
                         df.at[i,'color'] = '2'
                 else:
                     df.at[i,'Status'] = 'Drug Interaction'
                     df.at[i,'color'] = '2'
-
-        fig = px.imshow(df.pivot('Row', 'Column', 'color'),color_continuous_scale="Blues")
+        fig = px.imshow(df.pivot('Row', 'Column', 'color'),color_continuous_scale='Blues')
         fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Status'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
         fig.update_traces(dict(showscale=False, coloraxis=None,colorscale='Blues'))
         fig.update_layout(height=738,width=1291.5,)
