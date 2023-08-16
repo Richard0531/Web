@@ -885,31 +885,28 @@ def crispr(request):
 def image(request):
     
     app = DjangoDash('app_image',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
+    file_upload = html.Div([
+            html.Div([
+            html.Div(children=[
+                dcc.Upload(id='upload-data1',children=html.Div([html.A('Select Whole Image Population file')]),)],
+                style={'width': '20%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            html.Div(children=[
+                dcc.Upload(id='upload-data2',children=html.Div([html.A('Select Drug Interaction FOV file')]),)],
+                style={'width': '20%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            html.Div(children=[
+                dcc.Upload(id='upload-data3',children=html.Div([html.A('Select PlateResult file')]),)],
+                style={'width': '20%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+                ]),
+                ], style={'display': 'block'}, id='check-container')
     app.layout = html.Div([
-        dcc.Upload(
-            id='upload-data',
-            children=html.Div([
-                html.A('Select Files (xlsx,csv)')
-            ]),
-            style={
-            'width': '30%',
-            'height': '30px',
-            'lineHeight': '30px',
-            'borderWidth': '1px',
-            'borderStyle': 'solid',
-            'borderRadius': '5px',
-            'textAlign': 'center',
-            'margin': '2px'
-            },
-            multiple=True
-        ),
+        dbc.Row([dbc.Col(file_upload)]),
         dcc.Upload(
             id='upload-image',
             children=html.Div([
                 html.A('Select Image (jpg,png)')
             ]),
             style={
-            'width': '30%',
+            'width': '60%',
             'height': '30px',
             'lineHeight': '30px',
             'borderWidth': '1px',
@@ -924,96 +921,65 @@ def image(request):
         html.Div(id="output-plot-upload"),
         html.Div(id='output-data-upload'),
         ])
-    def parse_contents(contents, filename,date):
+    def parse_contents(contents):
         content_type, content_string = contents.split(',')        
+        decoded = base64.b64decode(content_string)                                       
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9)
+    def parse_contents_plate(contents):
+        content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
-        try:
-            if 'csv' in filename:
-                df = pd.read_csv(
-                    io.StringIO(decoded.decode('utf-8')))
-                df['Status'] = ''
-                df['color'] = ''
-                if 'Hole Significance' in df.columns:
-                    df['Hole Status'] = ''
-                    df['Hole Status'] = df['Hole Significance'] * df['Hole Factor']
-                else:
-                    df['Hole Status'] = 999
-                for i in range(len(df)):
-                    if df.at[i,'Drug Interaction FOV - Number of Objects'] == 0:
-                        df.at[i,'Status'] = 'Normal'
-                        df.at[i,'color'] = '1'
-                    elif df.at[i,'Peeling Factor'] < 0.0001:
-                        df.at[i,'Status'] = 'Drug Interaction'
-                        df.at[i,'color'] = '2'
-                    elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] < 9500:
-                        if df.at[i,'Hole Status'] < 0.4:
-                            df.at[i,'Status'] = 'Drug Interaction'
-                            df.at[i,'color'] = '2'
-                        else:
-                            df.at[i,'Status'] = 'Peeling'
-                            df.at[i,'color'] = '3'
-                    elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] > 9500:
-                        if df.at[i,'Empty Ratio'] < 0.9:
-                            if df.at[i,'Hole Status'] < 0.4:
-                                df.at[i,'Status'] = 'Drug Interaction'
-                                df.at[i,'color'] = '2'
-                            else:
-                                df.at[i,'Status'] = 'Peeling'
-                                df.at[i,'color'] = '3'
-                        else:
-                            df.at[i,'Status'] = 'Drug Interaction'
-                            df.at[i,'color'] = '2'
-                    else:
-                        df.at[i,'Status'] = 'Drug Interaction'
-                        df.at[i,'color'] = '2'
-            elif 'xls' in filename:
-                df = pd.read_excel(io.BytesIO(decoded))
-                df['Status'] = '' 
-                df['color'] = ''
-                if 'Hole Significance' in df.columns:
-                    df['Hole Status'] = ''
-                    df['Hole Status'] = df['Hole Significance'] * df['Hole Factor']
-                else:
-                    df['Hole Status'] = 999
-                for i in range(len(df)):
-                    if df.at[i,'Drug Interaction FOV - Number of Objects'] == 0:
-                        df.at[i,'Status'] = 'Normal'
-                        df.at[i,'color'] = '1'
-                    elif df.at[i,'Peeling Factor'] < 0.0001:
-                        df.at[i,'Status'] = 'Drug Interaction'
-                        df.at[i,'color'] = '2'
-                    elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] < 9500:
-                        if df.at[i,'Hole Status'] < 0.4:
-                            df.at[i,'Status'] = 'Drug Interaction'
-                            df.at[i,'color'] = '2'
-                        else:
-                            df.at[i,'Status'] = 'Peeling'
-                            df.at[i,'color'] = '3'
-                    elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] > 9500:
-                        if df.at[i,'Empty Ratio'] < 0.9:
-                            if df.at[i,'Hole Status'] < 0.4:
-                                df.at[i,'Status'] = 'Drug Interaction'
-                                df.at[i,'color'] = '2'
-                            else:
-                                df.at[i,'Status'] = 'Peeling'
-                                df.at[i,'color'] = '3'
-                        else:
-                            df.at[i,'Status'] = 'Drug Interaction'
-                            df.at[i,'color'] = '2'
-                    else:
-                        df.at[i,'Status'] = 'Drug Interaction'
-                        df.at[i,'color'] = '2'
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=8)
+    @app.callback(Output('output-data-upload', 'children'),
+              [Input('upload-data1', 'contents'),
+               Input('upload-data2', 'contents'),
+               Input('upload-data3', 'contents')]
+              )
+    def update_output(contents1,contents2,contents3):
+        if contents1 is None or contents2 is None or contents3 is None:
+            return 'Upload all files'
+        df1 = parse_contents(contents1)
+        df2 = parse_contents(contents2)
+        df3 = parse_contents_plate(contents3)
+        columns_to_convert = ['Row', 'Column','Field']
+        columns_to_convert_plate = ['Row', 'Column']
+        df1[columns_to_convert] = df1[columns_to_convert].astype(str)
+        df2[columns_to_convert] = df2[columns_to_convert].astype(str)
+        df3[columns_to_convert_plate] = df3[columns_to_convert_plate].astype(str)
+        df1['ID'] = df1['Row'] + df1['Column'] + df1['Field']
+        df1['Well ID'] = df1['Row'] + df1['Column']
+        df2['ID'] = df2['Row'] + df2['Column'] + df2['Field']
+        df3['Well ID'] = df3['Row'].astype(str) + df3['Column'].astype(str)
+        columns_to_delete_1 = [2,3,5,6,7,8,9,10,14,18]
+        columns_to_delete_2 = [0,1,2,3,4,5,11,12,13,14,18]
+        columns_to_delete_3 = [2,3,15,16,17,21,22]
+        df1 = df1.drop(df1.columns[columns_to_delete_1], axis=1)
+        df2 = df2.drop(df2.columns[columns_to_delete_2], axis=1)
+        df3 = df3.drop(df3.columns[columns_to_delete_3], axis=1)
+        df = pd.merge(df1, df2, how='left', on='ID')
+        df['Status'] = ''
+        for i in range(len(df)):
+            if df.at[i,'Whole Image Population - Peeling Factor-2'] < 0.0001:
+                df.at[i,'Status'] = 'Drug Interaction'
             else:
-                df = pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9) 
-                df.rename(columns={df.columns[-1]: 'Status'}, inplace=True)
-                                       
-        except Exception as e:
-            print(e)
-            return html.Div([
-                'There was an error processing this file.'
-                ])
+                df.at[i,'Status'] = 'Peeling'
+        summary_table = df.pivot_table(index='Well ID', columns='Status', aggfunc='size', fill_value=0)
+        summary_table['Normal'] = 9-summary_table['Drug Interaction'] - summary_table['Peeling']
+        summary_table = summary_table.reset_index()
+        df_plate = pd.merge(df3, summary_table, how='left', on='Well ID')
+        df_plate['Status'] = ''
+        df_plate['Color'] = ''
+        for i in range(len(df_plate)):
+            if df_plate.at[i,'Peeling'] > 4:
+                df_plate.at[i,'Status'] = 'Fail'
+                df_plate.at[i,'Color'] = '3'
+            else:
+                df_plate.at[i,'Status'] = 'Pass'
+                df_plate.at[i,'Color'] = '2'
+        
+        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),color_continuous_scale="Blues")
+        fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'Status'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
         return html.Div([
-            html.H5(filename),
+            dcc.Graph(id="indicator-graphic", figure=fig, clear_on_unhover=True,config={"displaylogo": False}),
             dash_table.DataTable(
                     df.to_dict('records'),
                     [{'name': i, 'id': i,"hideable":True} for i in df.columns],
@@ -1024,23 +990,27 @@ def image(request):
                     sort_mode="multi",
                     page_action="native",
                     #hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
-                    export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
+                    export_format='xlsx',export_headers='display',
                     style_table={'overflowX': 'auto'},
                     style_cell={'height': 'auto','overflow': 'hidden','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'}],
                     style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
                 ),
-
+            dash_table.DataTable(
+                    df_plate.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in df_plate.columns],
+                    page_size= 25,
+                    filter_action="native",
+                    filter_options = {'case':'insensitive'},
+                    sort_action="native",
+                    sort_mode="multi",
+                    page_action="native",
+                    #hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
+                    export_format='xlsx',export_headers='display',
+                    style_table={'overflowX': 'auto'},
+                    style_cell={'height': 'auto','overflow': 'hidden','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'}],
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                ),
                 ])
-    @app.callback(Output('output-data-upload', 'children'),
-              Input('upload-data', 'contents'),
-              State('upload-data', 'filename'),
-              State('upload-data','last_modified'))
-    def update_output(list_of_contents, list_of_names, list_of_dates):
-        if list_of_contents is not None:
-            children = [
-                parse_contents(c, n, d) for c, n, d in
-                zip(list_of_contents, list_of_names, list_of_dates)]
-            return children
     def image_contents(contents):
         content_type, content_string = contents.split(',')
         decoded_image = base64.b64decode(content_string)
@@ -1115,168 +1085,6 @@ def image(request):
           #      image_contents(c, n) for c, n,  in
            #     zip(list_of_contents, list_of_names)]
             #return children
-    def plot_contents(table_contents, table_filename, table_date,img_contents,img_filename,img_date ):
-        table_content_type, table_content_string = table_contents.split(',')        
-        decoded = base64.b64decode(table_content_string)
-        if 'csv' in table_filename:
-            df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
-            df['Status'] = ''
-            df['color'] = ''
-            if 'Hole Significance' in df.columns:
-                    df['Hole Status'] = ''
-                    df['Hole Status'] = df['Hole Significance'] * df['Hole Factor']
-            else:
-                    df['Hole Status'] = 999
-            for i in range(len(df)):
-                if df.at[i,'Drug Interaction FOV - Number of Objects'] == 0:
-                    df.at[i,'Status'] = 'Normal'
-                    df.at[i,'color'] = '1'
-                elif df.at[i,'Peeling Factor'] < 0.0001:
-                    df.at[i,'Status'] = 'Drug Interaction'
-                    df.at[i,'color'] = '2'
-                elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] < 9500:
-                    if df.at[i,'Hole Status'] < 0.4:
-                        df.at[i,'Status'] = 'Drug Interaction'
-                        df.at[i,'color'] = '2'
-                    else:
-                        df.at[i,'Status'] = 'Peeling'
-                        df.at[i,'color'] = '3'
-                df.at[i,'Status'] = 'Drug Interaction'elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] > 9500:
-                    if df.at[i,'Empty Ratio'] < 0.9:
-                        if df.at[i,'Hole Status'] < 0.4:
-                            df.at[i,'Status'] = 'Drug Interaction'
-                            df.at[i,'color'] = '2'
-                        else:
-                            df.at[i,'Status'] = 'Peeling'
-                            df.at[i,'color'] = '3'
-                    else:
-                        df.at[i,'Status'] = 'Drug Interaction'
-                        df.at[i,'color'] = '2'
-                else:
-                    df.at[i,'Status'] = 'Drug Interaction'
-                    df.at[i,'color'] = '2'
-        elif 'xls' in table_filename:
-            df = pd.read_excel(io.BytesIO(decoded))
-            df['Status'] = ''
-            df['color'] = ''
-            if 'Hole Significance' in df.columns:
-                    df['Hole Status'] = ''
-                    df['Hole Status'] = df['Hole Significance'] * df['Hole Factor']
-            else:
-                    df['Hole Status'] = 999
-            for i in range(len(df)):
-                if df.at[i,'Drug Interaction FOV - Number of Objects'] == 0:
-                    df.at[i,'Status'] = 'Normal'
-                    df.at[i,'color'] = '1'
-                elif df.at[i,'Peeling Factor'] < 0.0001:
-                    df.at[i,'Status'] = 'Drug Interaction'
-                    df.at[i,'color'] = '2'
-                elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] < 9500:
-                    if df.at[i,'Hole Status'] < 0.4:
-                        df.at[i,'Status'] = 'Drug Interaction'
-                        df.at[i,'color'] = '2'
-                    else:
-                        df.at[i,'Status'] = 'Peeling'
-                        df.at[i,'color'] = '3'
-                elif df.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] > 9500:
-                    if df.at[i,'Empty Ratio'] < 0.9:
-                        if df.at[i,'Hole Status'] < 0.4:
-                            df.at[i,'Status'] = 'Drug Interaction'
-                            df.at[i,'color'] = '2'
-                        else:
-                            df.at[i,'Status'] = 'Peeling'
-                            df.at[i,'color'] = '3'
-                    else:
-                        df.at[i,'Status'] = 'Drug Interaction'
-                        df.at[i,'color'] = '2'
-                else:
-                    df.at[i,'Status'] = 'Drug Interaction'
-                    df.at[i,'color'] = '2'
-        fig = px.imshow(df.pivot('Row', 'Column', 'color'),color_continuous_scale='Blues')
-        fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Status'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
-        fig.update_traces(dict(showscale=False, coloraxis=None,colorscale='Blues'))
-        fig.update_layout(height=738,width=1291.5,)
-        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
-        fig.add_vline(x=3.5,line_width=1, line_dash="dash"),fig.add_shape(x0=4.5,x1 = 4.5, y0=-0.5,y1 = 11.5 ,line_width=1, line_dash="dash"),fig.add_vline(x=5.5,line_width=1, line_dash="dash")
-        fig.add_shape(x0=6.5,x1 = 6.5,y0 = -0.5,y1= 11.5,line_width=1, line_dash="dash"),fig.add_vline(x=7.5,line_width=1, line_dash="dash")
-        fig.add_shape(x0=8.5,x1 = 8.5,y0=-0.5,y1 = 11.5,line_width=1, line_dash="dash")
-        fig.add_vline(x=9.5,line_width=1, line_dash="dash")
-        fig.add_shape(x0=10.5,x1 = 10.5,y0=-0.5,y1 = 11.5,line_width=1, line_dash="dash"),fig.add_vline(x=11.5,line_width=1, line_dash="dash")
-        fig.add_shape(x0=12.5,x1=12.5,y0=-0.5,y1 = 11.5,line_width=1, line_dash="dash")
-        fig.add_shape(x0=2.5,x1 = 2.5,y0=-0.5,y1 = 11.5,line_width=1, line_dash="dash"),fig.add_vline(x=13.5,line_width=1, line_dash="dash")
-        fig.add_shape(x0=14.5,x1 = 14.5,y0=-0.5,y1 = 11.5,line_width=1, line_dash="dash"),
-        fig.add_vline(x=15.5,line_width=1, line_dash="dash"),fig.add_shape(x0=16.5,x1 = 16.5,y0=-0.5,y1 = 11.5,line_width=1, line_dash="dash"),fig.add_vline(x=17.5,line_width=1, line_dash="dash")
-        fig.add_shape(x0=18.5,x1 = 18.5,y0=-0.5,y1 = 11.5,line_width=1, line_dash="dash"),fig.add_vline(x=19.5,line_width=1, line_dash="dash")
-        fig.add_shape(x0=20.5,x1 = 20.5,y0=-0.5,y1 = 11.5,line_width=1, line_dash="dash")
-        fig.add_vline(x=21.5,line_width=1, line_dash="dash"),fig.add_shape(x0=22.5,x1 = 22.5,y0=-0.5,y1 = 11.5,line_width=1, line_dash="dash")
-        fig.add_hline(y=1.5,line_width=1, line_dash="dash"),fig.add_hline(y=2.5,line_width=1, line_dash="dash"),fig.add_hline(y=3.5,line_width=1, line_dash="dash")
-        fig.add_hline(y=4.5,line_width=1, line_dash="dash"),fig.add_hline(y=5.5,line_width=1, line_dash="dash"),fig.add_hline(y=6.5,line_width=1, line_dash="dash")
-        fig.add_hline(y=7.5,line_width=1, line_dash="dash"),fig.add_hline(y=8.5,line_width=1, line_dash="dash"),
-        fig.add_hline(y=9.5,line_width=1, line_dash="dash"),fig.add_hline(y=0.5,line_width=1, line_dash="dash"),fig.add_hline(y=10.5,line_width=1, line_dash="dash")
-        fig.add_shape(type="rect",x0=2.5, y0=3.5, x1=3.5, y1=4.5,fillcolor="Grey",),fig.add_shape(type="rect",x0=2.5, y0=9.5, x1=3.5, y1=10.5,fillcolor="Grey",)
-        fig.add_shape(type="rect",x0=2.5,y0=-0.5,x1=3.5,y1=5.5)
-        fig.add_annotation(x=3, y=-1.0,text='Control',showarrow=False,)
-        fig.add_shape(type="rect",x0=3.5,y0=-0.5,x1=5.5,y1=5.5)
-        fig.add_annotation(x=4.5, y=-1.0,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 4), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=5.5,y0=-0.5,x1=7.5,y1=5.5)
-        fig.add_annotation(x=6.5, y=-1.0,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 6), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=7.5,y0=-0.5,x1=9.5,y1=5.5)
-        fig.add_annotation(x=8.5, y=-1.0,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 8), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=9.5,y0=-0.5,x1=11.5,y1=5.5)
-        fig.add_annotation(x=10.5, y=-1.0,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 10), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=11.5,y0=-0.5,x1=13.5,y1=5.5)
-        fig.add_annotation(x=12.5, y=-1.0,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 12), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=13.5,y0=-0.5,x1=15.5,y1=5.5)
-        fig.add_annotation(x=14.5, y=-1.0,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 14), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=15.5,y0=-0.5,x1=17.5,y1=5.5)
-        fig.add_annotation(x=16.5, y=-1.0,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 16), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=17.5,y0=-0.5,x1=19.5,y1=5.5)
-        fig.add_annotation(x=18.5, y=-1.0,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 18), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=19.5,y0=-0.5,x1=21.5,y1=5.5)
-        fig.add_annotation(x=20.5, y=-1.0,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 20), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=21.5,y0=-0.5,x1=23.5,y1=5.5)
-        fig.add_annotation(x=22.5, y=-1.0,text=df.loc[(df['Row'] == 'B') & (df['Column'] == 22), 'Compound'].values[0],showarrow=False,) 
-        fig.add_shape(type="rect",x0=2.5,y0=5.5,x1=3.5,y1=11.5)
-        fig.add_annotation(x=3, y=12.0,text='Control',showarrow=False,)
-        fig.add_shape(type="rect",x0=3.5,y0=5.5,x1=5.5,y1=11.5) 
-        fig.add_annotation(x=4.5, y=12.0,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 4), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=5.5,y0=5.5,x1=7.5,y1=11.5)
-        fig.add_annotation(x=6.5, y=12.0,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 6), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=7.5,y0=5.5,x1=9.5,y1=11.5)
-        fig.add_annotation(x=8.5, y=12.0,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 8), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=9.5,y0=5.5,x1=11.5,y1=11.5)
-        fig.add_annotation(x=10.5, y=12.0,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 10), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=11.5,y0=5.5,x1=13.5,y1=11.5)
-        fig.add_annotation(x=12.5, y=12.0,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 12), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=13.5,y0=5.5,x1=15.5,y1=11.5)
-        fig.add_annotation(x=14.5, y=12.0,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 14), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=15.5,y0=5.5,x1=17.5,y1=11.5)
-        fig.add_annotation(x=16.5, y=12.0,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 16), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=17.5,y0=5.5,x1=19.5,y1=11.5)
-        fig.add_annotation(x=18.5, y=12.0,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 18), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=19.5,y0=5.5,x1=21.5,y1=11.5)
-        fig.add_annotation(x=20.5, y=12.0,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 20), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=21.5,y0=5.5,x1=23.5,y1=11.5)
-        fig.add_annotation(x=22.5, y=12.0,text=df.loc[(df['Row'] == 'J') & (df['Column'] == 22), 'Compound'].values[0],showarrow=False,)
-        fig.add_shape(type="rect",x0=2.5,y0=5.5,x1=3.5,y1=11.5)
-        return html.Div([
-            dcc.Graph(id="indicator-graphic", figure=fig, clear_on_unhover=True,config={"displaylogo": False}),
-            ])
-    @app.callback(
-        Output("output-plot-upload", 'children'),
-        Input('upload-data', 'contents'),
-        Input('upload-image', 'contents'),
-        State('upload-data', 'filename'),
-        State('upload-data', 'last_modified'),
-        State('upload-image', 'filename'),
-        State('upload-image', 'last_modified'),
-        )
-    def plot_graph(table_contents,img_contents, table_names, table_dates, img_filename,img_last_modified):
-        if table_contents is not None:
-            if img_contents is not None:
-                children = [plot_contents(c, n, d, cc, nn, dd) for c, n, d, cc, nn, dd in 
-                    zip(table_contents, table_names, table_dates,img_contents,img_filename,img_last_modified)]
-                return children
 
     context = {}
     return render(request, 'catalog/image.html',context)    
