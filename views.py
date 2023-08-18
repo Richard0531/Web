@@ -889,16 +889,25 @@ def image(request):
     file_upload = html.Div([
             html.Div([
             html.Div(children=[
-                dcc.Upload(id='upload-data1',children=html.Div([html.A('Select Whole Image Population file')]),)],
+                dcc.Upload(id='upload-data1',children=html.Div([html.A('Select Drug Interaction FOV file')]),)],
                 style={'width': '20%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
             html.Div(children=[
-                dcc.Upload(id='upload-data2',children=html.Div([html.A('Select Drug Interaction FOV file')]),)],
+                dcc.Upload(id='upload-data2',children=html.Div([html.A('Select Whole Image population file')]),)],
                 style={'width': '20%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
             html.Div(children=[
                 dcc.Upload(id='upload-data3',children=html.Div([html.A('Select PlateResult file')]),)],
                 style={'width': '20%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
                 ]),
                 ], style={'display': 'block'}, id='check-container')
+    plot_upload = html.Div([
+            html.Div([
+            html.Div(children=[
+                dcc.Graph(id='output-image-upload', clear_on_unhover=True,config={"displaylogo": False, 'modeBarButtonsToAdd':['zoom2d','drawopenpath','drawrect', 'eraseshape','resetViews','resetGeo'], }),
+                ]),
+             html.Div(children=[
+                html.Div(id='output-data-upload'),])
+                ])
+                ], style={'display': 'block'}, id='check-container2')
     app.layout = html.Div([
         dbc.Row([dbc.Col(file_upload)]),
         dcc.Upload(
@@ -918,9 +927,7 @@ def image(request):
             },
             multiple=True
         ),
-        dcc.Graph(id='output-image-upload', clear_on_unhover=True,config={"displaylogo": False, 'modeBarButtonsToAdd':['zoom2d','drawopenpath','drawrect', 'eraseshape','resetViews','resetGeo'], }),
-        html.Div(id="output-plot-upload"),
-        html.Div(id='output-data-upload'),
+        dbc.Row([dbc.Col(plot_upload)]),
         ])
     def parse_contents(contents):
         content_type, content_string = contents.split(',')        
@@ -938,8 +945,8 @@ def image(request):
     def update_output(contents1,contents2,contents3):
         if contents1 is None or contents2 is None or contents3 is None:
             return 'Upload all files'
-        df1 = parse_contents(contents1)
-        df2 = parse_contents(contents2)
+        df1 = parse_contents(contents2)
+        df2 = parse_contents(contents1)
         df3 = parse_contents_plate(contents3)
         columns_to_convert = ['Row', 'Column','Field']
         columns_to_convert_plate = ['Row', 'Column']
@@ -978,34 +985,80 @@ def image(request):
             else:
                 df_plate.at[i,'Status'] = 'Pass'
         for i in range(len(df_plate)):
-            if df_plate.at[i,'Peeling'] > 0:
-                df_plate.at[i,'Well Result'] = 'Peeling'
-                df_plate.at[i,'Color'] = '3'
-            elif df_plate.at[i,'Drug Interaction'] > 0:
-                df_plate.at[i,'Well Result'] = 'Drug Interaction'
-                df_plate.at[i,'Color'] = '2'
-            else:
+            if df_plate.at[i,'Normal'] == 9:
                 df_plate.at[i,'Well Result'] = 'Normal'
                 df_plate.at[i,'Color'] = '1'
+            elif df_plate.at[i,'Peeling Factor'] >0.0001:
+                df_plate.at[i,'Well Result'] = 'Peeling'
+                df_plate.at[i,'Color'] = '3'
+            else:
+                df_plate.at[i,'Well Result'] = 'Drug Interaction'
+                df_plate.at[i,'Color'] = '2'
         df_plate['FOV']= 'Normal: '+ df_plate['Normal'].astype(str) + '\n' + 'DI: ' + df_plate['Drug Interaction'].astype(str) + '\n' + 'Peeling: ' + df_plate['Peeling'].astype(str)
         df_plate['FOV']=df_plate['FOV'] + '\n' + 'Well Result: ' + df_plate['Well Result'].astype(str)
+        df_plate[columns_to_convert_plate] = df_plate[columns_to_convert_plate].astype(int)
         fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),color_continuous_scale="Blues")
         fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'FOV'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>FOV: %{customdata}<br><extra></extra>'}])
+        fig.update_traces(dict(showscale=False, coloraxis=None,colorscale='Blues'))
+        fig.update_layout(height=738,width=1291.5,)
+        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5),fig.add_vline(x=3.5,line_width=1),fig.add_vline(x=4.5,line_width=1, line_dash="dash")
+        fig.add_vline(x=5.5,line_width=1),fig.add_vline(x=6.5,line_width=1, line_dash="dash"),fig.add_vline(x=7.5,line_width=1)
+        fig.add_vline(x=8.5,line_width=1, line_dash="dash"),fig.add_vline(x=9.5,line_width =1),fig.add_vline(x=10.5,line_width=1, line_dash="dash")
+        fig.add_vline(x=11.5,line_width=1),fig.add_vline(x=12.5,line_width=1, line_dash="dash"),fig.add_vline(x=13.5,line_width=1)
+        fig.add_vline(x=14.5,line_width=1, line_dash="dash"),fig.add_vline(x=15.5,line_width=1),fig.add_vline(x=16.5,line_width=1, line_dash="dash")
+        fig.add_vline(x=17.5,line_width=1),fig.add_vline(x=18.5,line_width=1, line_dash="dash"),fig.add_vline(x=19.5,line_width=1)
+        fig.add_vline(x=20.5,line_width=1, line_dash="dash"),fig.add_vline(x=21.5,line_width=1),fig.add_vline(x=22.5,line_width=1, line_dash="dash")
+        fig.add_hline(y=2.5,line_width=1, line_dash="dash"),fig.add_hline(y=3.5,line_width=1, line_dash="dash"),fig.add_hline(y=4.5,line_width=1, line_dash="dash")
+        fig.add_hline(y=5.5,line_width=1, line_dash="dash"),fig.add_hline(y=6.5,line_width=1, line_dash="dash"),fig.add_hline(y=7.5,line_width=1, line_dash="dash")
+        fig.add_hline(y=8.5,line_width=1),fig.add_hline(y=9.5,line_width=1, line_dash="dash"),fig.add_hline(y=10.5,line_width=1, line_dash="dash")
+        fig.add_hline(y=11.5,line_width=1, line_dash="dash"),fig.add_hline(y=12.5,line_width=1, line_dash="dash"),fig.add_hline(y=13.5,line_width=1, line_dash="dash")
+        fig.add_hline(y=14.5,line_width=1, line_dash="dash")
+        fig.add_shape(type="rect",x0=2.5, y0=5.5, x1=3.5, y1=6.5,fillcolor="Grey",),fig.add_shape(type="rect",x0=2.5, y0=13.5, x1=3.5, y1=14.5,fillcolor="Grey",)
+        fig.add_shape(type="rect",x0=2.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
+        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,),fig.add_annotation(x=3, y=9,text='Control',showarrow=False,)
+        fig.add_annotation(x=4.5, y=8,text=df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == 4), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=6.5, y=8,text=df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == 6), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=8.5, y=8,text=df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == 8), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=10.5, y=8,text=df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == 10), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=12.5, y=8,text=df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == 12), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=14.5, y=8,text=df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == 14), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=16.5, y=8,text=df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == 16), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=18.5, y=8,text=df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == 18), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=20.5, y=8,text=df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == 20), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=22.5, y=8,text=df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == 22), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=4.5, y=9,text=df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == 4), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=6.5, y=9,text=df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == 6), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=8.5, y=9,text=df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == 8), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=10.5, y=9,text=df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == 10), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=12.5, y=9,text=df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == 12), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=14.5, y=9,text=df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == 14), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=16.5, y=9,text=df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == 16), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=18.5, y=9,text=df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == 18), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=20.5, y=9,text=df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == 20), 'Compound'].values[0],showarrow=False,)
+        fig.add_annotation(x=22.5, y=9,text=df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == 22), 'Compound'].values[0],showarrow=False,)
         return html.Div([
             dcc.Graph(id="indicator-graphic", figure=fig, clear_on_unhover=True,config={"displaylogo": False}),
             dash_table.DataTable(
                     df.to_dict('records'),
                     [{'name': i, 'id': i,"hideable":True} for i in df.columns],
+                    fixed_columns={ 'data': 2},
                     page_size= 25,
                     filter_action="native",
                     filter_options = {'case':'insensitive'},
                     sort_action="native",
                     sort_mode="multi",
                     page_action="native",
+                    style_data_conditional=[
+                         {'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'},
+                         {'if': {'filter_query': '{Whole Image Population - Peeling Factor-2} > 0.0001','column_id': 'Whole Image Population - Peeling Factor-2'},'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Status} = Peeling','column_id': 'Status'},'backgroundColor': 'red','color':'white'}, 
+                    ],
                     #hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
                     export_format='xlsx',export_headers='display',
                     style_table={'overflowX': 'auto'},
-                    style_cell={'height': 'auto','overflow': 'hidden','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'}],
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
                     style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
                 ),
             dash_table.DataTable(
@@ -1021,7 +1074,13 @@ def image(request):
                     #hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
                     export_format='xlsx',export_headers='display',
                     style_table={'overflowX': 'auto'},
-                    style_cell={'height': 'auto','overflow': 'hidden','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'}],
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_data_conditional=[
+                         {'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'},
+                         {'if': {'filter_query': '{Peeling Factor} > 0.0001','column_id': 'Peeling Factor'},'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Well Result} = Peeling','column_id': 'Well Result'},'backgroundColor': 'red','color':'white'},
+                    ],
                     style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
                 ),
                 ])
@@ -1051,10 +1110,26 @@ def image(request):
                 fig.update_xaxes(showticklabels=False)
                 fig.update_yaxes(showticklabels=False)
                 fig.add_annotation(x=(((image.shape[1] /21) * 1 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='3',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 2 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='4',showarrow=False,)
                 fig.add_annotation(x=(((image.shape[1] /21) * 3 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='5',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 4 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='6',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 5 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='7',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 6 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='8',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 7 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='9',showarrow=False,)
                 fig.add_annotation(x=(((image.shape[1] /21) * 8 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='10',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 9 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='11',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 10 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='12',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 11 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='13',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 12 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='14',showarrow=False,)
                 fig.add_annotation(x=(((image.shape[1] /21) * 13 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='15',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 14 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='16',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 15 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='17',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 16 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='18',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 17 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='19',showarrow=False,)
                 fig.add_annotation(x=(((image.shape[1] /21) * 18 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='20',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 19 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='21',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 20 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='22',showarrow=False,)
+                fig.add_annotation(x=(((image.shape[1] /21) * 21 ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text='23',showarrow=False,)
                 fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * 1 ) - (image.shape[0] /24)),text='B',showarrow=False,)
                 fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * 2 ) - (image.shape[0] /24)),text='C',showarrow=False,)
                 fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * 3 ) - (image.shape[0] /24)),text='D',showarrow=False,)
