@@ -897,6 +897,9 @@ def image(request):
             html.Div(children=[
                 dcc.Upload(id='upload-data3',children=html.Div([html.A('Select PlateResult file')]),)],
                 style={'width': '20%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            html.Div(children=[
+                dcc.Upload(id='upload-data4',children=html.Div([html.A('Select Spot file')]),)],
+                style={'width': '20%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
                 ]),
                 ], style={'display': 'block'}, id='check-container')
     plot_upload = html.Div([
@@ -916,7 +919,7 @@ def image(request):
                 html.A('Select Image (jpg,png)')
             ]),
             style={
-            'width': '60%',
+            'width': '80%',
             'height': '30px',
             'lineHeight': '30px',
             'borderWidth': '1px',
@@ -929,41 +932,53 @@ def image(request):
         ),
         dbc.Row([dbc.Col(plot_upload)]),
         ])
-    def parse_contents(contents):
-        content_type, content_string = contents.split(',')        
-        decoded = base64.b64decode(content_string)                                       
-        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9)
-    def parse_contents_plate(contents):
+    def parse_contents_plate(contents,columns):
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
-        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=8)
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=8,usecols = columns)
+    def parse_contents_columns(contents,columns):
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9,usecols = columns)
     @app.callback(Output('output-data-upload', 'children'),
               [Input('upload-data1', 'contents'),
                Input('upload-data2', 'contents'),
-               Input('upload-data3', 'contents')]
+               Input('upload-data3', 'contents'),
+               
+               ]
               )
     def update_output(contents1,contents2,contents3):
         if contents1 is None or contents2 is None or contents3 is None:
             return 'Upload all files'
-        df1 = parse_contents(contents2)
-        df2 = parse_contents(contents1)
-        df3 = parse_contents_plate(contents3)
+        columns_df1 = [0,1,4,11,12,13,15,16,17,18,19,20,21]
+        columns_df2 = [0,1,4,16,17]
+        columns_df3 = [0,1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,23,24,25]
+        #columns_df4 = [0,1,4,15,16]
+        df1 = parse_contents_columns(contents2,columns_df1)
+        df2 = parse_contents_columns(contents1,columns_df2)
+        df3 = parse_contents_plate(contents3,columns_df3)
+        #df4 = parse_contents_columns(contents4,columns_df4)
         columns_to_convert = ['Row', 'Column','Field']
         columns_to_convert_plate = ['Row', 'Column']
         df1[columns_to_convert] = df1[columns_to_convert].astype(str)
         df2[columns_to_convert] = df2[columns_to_convert].astype(str)
+        #df4[columns_to_convert] = df4[columns_to_convert].astype(str)
         df3[columns_to_convert_plate] = df3[columns_to_convert_plate].astype(str)
         df1['ID'] = df1['Row'] + df1['Column'] + df1['Field']
         df1['Well ID'] = df1['Row'] + df1['Column']
         df2['ID'] = df2['Row'] + df2['Column'] + df2['Field']
-        df3['Well ID'] = df3['Row'].astype(str) + df3['Column'].astype(str)
-        columns_to_delete_1 = [2,3,5,6,7,8,9,10,14,18]
-        columns_to_delete_2 = [0,1,2,3,4,5,11,12,13,14,18]
-        columns_to_delete_3 = [2,3,15,16,17,21,22]
-        df1 = df1.drop(df1.columns[columns_to_delete_1], axis=1)
+        df3['Well ID'] = df3['Row'] + df3['Column']
+        #df4['ID'] = df4['Row'] + df4['Column'] + df4['Field']
+        #columns_to_delete_1 =[2,3,5,6,7,8,9,10,14,22]
+        columns_to_delete_2 = [0,1,2]
+        #columns_to_delete_4 = [0,1,2]
+        #columns_to_delete_3 = [2,3,20,21,22,26,27]
+        #df1 = df1.drop(df1.columns[columns_to_delete_1], axis=1)
         df2 = df2.drop(df2.columns[columns_to_delete_2], axis=1)
-        df3 = df3.drop(df3.columns[columns_to_delete_3], axis=1)
-        df = pd.merge(df1, df2, how='left', on='ID')
+        #df3 = df3.drop(df3.columns[columns_to_delete_3], axis=1)
+        #df4 = df4.drop(df4.columns[columns_to_delete_4], axis=1)
+        #df = pd.merge(df1, df4, how='left', on='ID')
+        df = pd.merge(df1, df2, how='left', on='ID') 
         df['Status'] = ''
         for i in range(len(df)):
             if np.isnan(df.at[i,'Whole Image Population - Empty Ratio-2']):
@@ -988,12 +1003,32 @@ def image(request):
             if df_plate.at[i,'Normal'] == 9:
                 df_plate.at[i,'Well Result'] = 'Normal'
                 df_plate.at[i,'Color'] = '1'
-            elif df_plate.at[i,'Peeling Factor'] >0.0001:
-                df_plate.at[i,'Well Result'] = 'Peeling'
-                df_plate.at[i,'Color'] = '3'
+            elif df_plate.at[i,'Peeling Factor']<0.0001:
+                if df_plate.at[i,'Whole Image Population - Peeling Factor-2 - Mean per Well'] > 0.0001 and df_plate.at[i,'Empty Ratio'] < 1:
+                    df_plate.at[i,'Well Result'] = 'Peeling'
+                    df_plate.at[i,'Color'] = '3'
+                else:    
+                    df_plate.at[i,'Well Result'] = 'Drug Interaction'
+                    df_plate.at[i,'Color'] = '2'
             else:
-                df_plate.at[i,'Well Result'] = 'Drug Interaction'
-                df_plate.at[i,'Color'] = '2'
+                if df_plate.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] < 9500:
+                    if df_plate.at[i,'Spots - Number of Objects'] < 10000 and  df_plate.at[i,'Hole Factor']<1:    
+                        if df_plate.at[i,'Normal FOV - Number of Objects'] >20000:
+                            df_plate.at[i,'Well Result'] = 'Drug Interaction'
+                            df_plate.at[i,'Color'] = '2'
+                        else:
+                            df_plate.at[i,'Well Result'] = 'Peeling'
+                            df_plate.at[i,'Color'] = '3'
+                    else:
+                        df_plate.at[i,'Well Result'] = 'Peeling'
+                        df_plate.at[i,'Color'] = '3'                  
+                else:
+                    if df_plate.at[i,'Whole Image Population - Peeling Factor-2 - Mean per Well'] > 0.0001 and df_plate.at[i,'Empty Ratio'] < 1:
+                        df_plate.at[i,'Well Result'] = 'Peeling'
+                        df_plate.at[i,'Color'] = '3'
+                    else:
+                        df_plate.at[i,'Well Result'] = 'Drug Interaction'
+                        df_plate.at[i,'Color'] = '2'
         df_plate['FOV']= 'Normal: '+ df_plate['Normal'].astype(str) + '\n' + 'DI: ' + df_plate['Drug Interaction'].astype(str) + '\n' + 'Peeling: ' + df_plate['Peeling'].astype(str)
         df_plate['FOV']=df_plate['FOV'] + '\n' + 'Well Result: ' + df_plate['Well Result'].astype(str)
         df_plate[columns_to_convert_plate] = df_plate[columns_to_convert_plate].astype(int)
@@ -1080,6 +1115,7 @@ def image(request):
                          {'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'},
                          {'if': {'filter_query': '{Peeling Factor} > 0.0001','column_id': 'Peeling Factor'},'backgroundColor': 'red','color':'white'},
                          {'if': {'filter_query': '{Well Result} = Peeling','column_id': 'Well Result'},'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Empty Area Population - Empty Image Region Area [µm²] - CV % per Well} <9500','column_id': 'Empty Area Population - Empty Image Region Area [µm²] - CV % per Well'},'backgroundColor': 'red','color':'white'},
                     ],
                     style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
                 ),
