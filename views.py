@@ -988,6 +988,10 @@ def image(request):
             else:
                 df.at[i,'Status'] = 'Peeling'
         summary_table = df.pivot_table(index='Well ID', columns='Status', aggfunc='size', fill_value=0)
+        if 'Peeling' in summary_table:
+            summary_table = summary_table
+        else:
+            summary_table['Peeling'] = 0
         summary_table['Normal'] = 9-summary_table['Drug Interaction'] - summary_table['Peeling']
         summary_table = summary_table.reset_index()
         df_plate = pd.merge(df3, summary_table, how='left', on='Well ID')
