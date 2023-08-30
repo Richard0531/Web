@@ -1036,9 +1036,13 @@ def image(request):
         df_plate['FOV']= 'Normal: '+ df_plate['Normal'].astype(str) + '\n' + 'DI: ' + df_plate['Drug Interaction'].astype(str) + '\n' + 'Peeling: ' + df_plate['Peeling'].astype(str)
         df_plate['FOV']=df_plate['FOV'] + '\n' + 'Well Result: ' + df_plate['Well Result'].astype(str)
         df_plate[columns_to_convert_plate] = df_plate[columns_to_convert_plate].astype(int)
-        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),color_continuous_scale="Blues")
+        
+        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues")
         fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'FOV'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>FOV: %{customdata}<br><extra></extra>'}])
-        fig.update_traces(dict(showscale=False, coloraxis=None,colorscale='Blues'))
+        fig.update_layout(coloraxis_showscale=False)
+        ###fig.update_traces(dict(showscale=True,colorscale = False))
+        #colors = [ "rgb(255,255,255)", "rgb(201,235,255)", "rgb(9, 15,188 )",]
+        #fig.update_coloraxes(colorscale=[(1, colors[0]),(2, colors[1]),(3, colors[2]),])
         fig.update_layout(height=738,width=1291.5,)
         fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
         fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
