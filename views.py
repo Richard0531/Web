@@ -42,6 +42,8 @@ import datetime
 import io
 import cv2
 import numpy as np
+import scipy.stats
+from scipy import stats
 @login_required(login_url='/accounts/login/')
 def index(request):
     
@@ -528,103 +530,115 @@ def overall (request):
                     if is_string_dtype(dff[Y]):
                         fig = px.histogram(dff, x=X, color = Y,text_auto=True,height = 800).update_xaxes(categoryorder='total descending')
                     else:
+                        cat = [dff[Y][dff[X] == category] for category in dff[X].unique()]
+                        statistic, p = stats.kruskal(*cat)
                         if 'Boxplots' in boxplot:
                             if 'Violin' in violin:
                                 if 'Dots' in dot:
                                     if group2 != 'N/A':
-                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True)
+                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups,box=True,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True,title = f"P-value: {p}")
                                     else:
-                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True)
+                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups,box=True,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True,title = f"P-value: {p}")
                                 else:
                                     if group2 != 'N/A':
-                                        fig = px.violin(dff,x = X,y=Y,points='outliers',color=groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',box=True)
+                                        fig = px.violin(dff,x = X,y=Y,points='outliers',color=groups,box=True,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',box=True,title = f"P-value: {p}")
                                     else:
-                                        fig = px.violin(dff,x = X,y=Y,points='outliers',color=groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',box=True)
+                                        fig = px.violin(dff,x = X,y=Y,points='outliers',color=groups,box=True,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',box=True,title = f"P-value: {p}")
                             else:
                                 if 'Dots' in dot:
                                     if group2 != 'N/A':
-                                        fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all')
+                                        fig = px.box(dff,x = X, y = Y,points = 'all',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all',title = f"P-value: {p}")
                                     else:
-                                        fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all')
+                                        fig = px.box(dff,x = X, y = Y,points = 'all',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all',title = f"P-value: {p}")
                                 else:
                                     if group2 != 'N/A':
-                                        fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers')
+                                        fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers',title = f"P-value: {p}")
                                     else:
-                                        fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers')
+                                        fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers',title = f"P-value: {p}")
                         else:
                             if 'Violin' in violin:
                                 if 'Dots' in dot:
                                     if group2 != 'N/A':
-                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all')
+                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',title = f"P-value: {p}")
                                     else:
-                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all')
+                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',title = f"P-value: {p}")
                                 else:
                                     if group2 != 'N/A':
-                                        fig = px.violin(dff,x=X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers')
+                                        fig = px.violin(dff,x=X, y = Y,points = 'outliers',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',title = f"P-value: {p}")
                                     else:
-                                        fig = px.violin(dff,x=X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers')
+                                        fig = px.violin(dff,x=X, y = Y,points = 'outliers',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',title = f"P-value: {p}")
                             else:
                                 if 'Dots' in dot:
                                     if  group2 != 'N/A':
-                                        fig = px.strip(dff,x = X, y = Y,color = groups,symbol=group2) if groups != 'N/A' else px.strip(dff,x = X, y = Y,symbol=group2)
+                                        fig = px.strip(dff,x = X, y = Y,color = groups,symbol=group2,title = f"P-value: {p}") if groups != 'N/A' else px.strip(dff,x = X, y = Y,symbol=group2,title = f"P-value: {p}")
                                     else:
-                                        fig = px.strip(dff,x = X, y = Y,color = groups) if groups != 'N/A' else px.strip(dff,x = X, y = Y)
+                                        fig = px.strip(dff,x = X, y = Y,color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.strip(dff,x = X, y = Y,title = f"P-value: {p}")
                 else:
                     if is_string_dtype(dff[Y]):
+                        cat = [dff[X][dff[Y] == category] for category in dff[Y].unique()]
+                        statistic, p = stats.kruskal(*cat)
                         if 'Boxplots' in boxplot:
                             if 'Violin' in violin:
                                 if 'Dots' in dot:
                                     if group2 != 'N/A':
-                                        fig = px.violin(dff,x=X,y=Y,points='all',color=groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True)
+                                        fig = px.violin(dff,x=X,y=Y,points='all',color=groups,box=True,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True,title = f"P-value: {p}")
                                     else:
-                                        fig = px.violin(dff,x=X,y=Y,points='all',color=groups,box=True) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True)
+                                        fig = px.violin(dff,x=X,y=Y,points='all',color=groups,box=True,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',box=True,title = f"P-value: {p}")
                                 else:
                                     if group2 != 'N/A':
-                                        fig = px.violin(dff,x=X,y=Y,points='outliers',color=groups,box=True) if groups != 'N/A' else px.violin(dff,x=X,y=Y,points='outliers',box=True)
+                                        fig = px.violin(dff,x=X,y=Y,points='outliers',color=groups,box=True,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x=X,y=Y,points='outliers',box=True,title = f"P-value: {p}")
                                     else:
-                                        fig = px.violin(dff,x=X,y=Y,points='outliers',color=groups,box=True) if groups != 'N/A' else px.violin(dff,x=X,y=Y,points='outliers',box=True)
+                                        fig = px.violin(dff,x=X,y=Y,points='outliers',color=groups,box=True,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x=X,y=Y,points='outliers',box=True,title = f"P-value: {p}")
                             else:
                                 if 'Dots' in dot:
                                     if group2 != 'N/A':
-                                        fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all')
+                                        fig = px.box(dff,x = X, y = Y,points = 'all',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all',title = f"P-value: {p}")
                                     else:
-                                        fig = px.box(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all')
+                                        fig = px.box(dff,x = X, y = Y,points = 'all',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'all',title = f"P-value: {p}")
                                 else:
                                     if group2 != 'N/A':
-                                        fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers')
+                                        fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers',title = f"P-value: {p}")
                                     else:
-                                        fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers')
+                                        fig = px.box(dff,x = X, y = Y,points = 'outliers',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.box(dff,x = X, y = Y,points = 'outliers',title = f"P-value: {p}")
                         else:
                             if 'Violin' in violin:
                                 if 'Dots' in dot:
                                     if group2 != 'N/A':
-                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all')
+                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',title = f"P-value: {p}")
                                     else:
-                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all')
+                                        fig = px.violin(dff,x = X, y = Y,points = 'all',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'all',title = f"P-value: {p}")
                                 else:
                                     if group2 != 'N/A':
-                                        fig = px.violin(dff,x = X, y=Y,points = 'outliers',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers')
+                                        fig = px.violin(dff,x = X, y=Y,points = 'outliers',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',title = f"P-value: {p}")
                                     else:
-                                        fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = groups) if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers')
+                                        fig = px.violin(dff,x = X, y = Y,points = 'outliers',color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.violin(dff,x = X, y = Y,points = 'outliers',title = f"P-value: {p}")
                             else:
                                 if 'Dots' in dot:
                                     if group2 != 'N/A':
-                                        fig = px.strip(dff,x = X, y = Y,color = groups,symbol=group2) if groups != 'N/A' else px.strip(dff,x = X, y = Y,symbol=group2)
+                                        fig = px.strip(dff,x = X, y = Y,color = groups,symbol=group2,title = f"P-value: {p}") if groups != 'N/A' else px.strip(dff,x = X, y = Y,symbol=group2,title = f"P-value: {p}")
                                     else:
-                                        fig = px.strip(dff,x = X, y = Y,color = groups) if groups != 'N/A' else px.strip(dff,x = X, y = Y)
+                                        fig = px.strip(dff,x = X, y = Y,color = groups,title = f"P-value: {p}") if groups != 'N/A' else px.strip(dff,x = X, y = Y,title = f"P-value: {p}")
                     else:
                         if groups != 'N/A':
                             if 'Trendlines' in trendline:
                                 if 'Boxplots' in boxplot:
                                     if group2 != 'N/A':
-                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,symbol=group2,marginal_x ='box',marginal_y ='box',height = 800)
+                                        r, p = scipy.stats.pearsonr(dff[X], dff[Y])
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,symbol=group2,marginal_x ='box',marginal_y ='box',height = 800,
+                                                          title = f"P-value: {p}")
                                     else:
-                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,marginal_x ='box',marginal_y ='box',height = 800)
+                                        r, p = scipy.stats.pearsonr(dff[X], dff[Y])
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,marginal_x ='box',marginal_y ='box',height = 800,
+                                                           title = f"P-value: {p}")
                                 else:
                                     if group2 != 'N/A':
-                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,symbol=group2,height = 800)
+                                        r, p = scipy.stats.pearsonr(dff[X], dff[Y])
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,symbol=group2,height = 800,
+                                                          title = f"P-value: {p}")
                                     else:
-                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,height = 800)
+                                        r, p = scipy.stats.pearsonr(dff[X], dff[Y])
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color = groups,height = 800,
+                                                         title = f"P-value: {p}")
                             else:
                                 if 'Boxplots' in boxplot:
                                     if group2 != 'N/A':
@@ -640,14 +654,22 @@ def overall (request):
                             if 'Trendlines' in trendline:  
                                 if 'Boxplots' in boxplot:
                                     if group2 != 'N/A':
-                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color=group2 ,marginal_x ='box',marginal_y ='box',height = 800)
+                                        r, p = scipy.stats.pearsonr(dff[X], dff[Y])
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",color=group2 ,marginal_x ='box',marginal_y ='box',height = 800,
+                                                         title = f"P-value: {p}")
                                     else:
-                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols" ,marginal_x ='box',marginal_y ='box',height = 800)
+                                        r, p = scipy.stats.pearsonr(dff[X], dff[Y])
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols" ,marginal_x ='box',marginal_y ='box',height = 800,
+                                                         title = f"P-value: {p}")
                                 else:
                                     if group2 != 'N/A':
-                                        fig = px.scatter(dff, x=X, y=Y,color=group2,trendline="ols",height = 800)
+                                        r, p = scipy.stats.pearsonr(dff[X], dff[Y])
+                                        fig = px.scatter(dff, x=X, y=Y,color=group2,trendline="ols",height = 800,
+                                                         title = f"P-value: {p}")
                                     else:
-                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",height = 800)
+                                        r, p = scipy.stats.pearsonr(dff[X], dff[Y])
+                                        fig = px.scatter(dff, x=X, y=Y,trendline="ols",height = 800,
+                                                         title = f"P-value: {p}")
                             else:
                                 if 'Boxplots' in boxplot:
                                     if group2 != 'N/A':
@@ -950,9 +972,9 @@ def image(request):
     def update_output(contents1,contents2,contents3):
         if contents1 is None or contents2 is None or contents3 is None:
             return 'Upload all files'
-        columns_df1 = [0,1,4,11,12,13,15,16,17,18,19,20,21]
-        columns_df2 = [0,1,4,16,17]
-        columns_df3 = [0,1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,23,24,25]
+        columns_df1 = [0,1,4,11,12,13,14,16,17,18,19,20,21,22]
+        columns_df2 = [0,1,4,17,18]
+        columns_df3 = [0,1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,23,24,25,26]
         #columns_df4 = [0,1,4,15,16]
         df1 = parse_contents_columns(contents2,columns_df1)
         df2 = parse_contents_columns(contents1,columns_df2)
@@ -1070,9 +1092,14 @@ def image(request):
                     sort_action="native",
                     sort_mode="multi",
                     page_action="native",
+                    style_header_conditional=[
+                         {'if': {'column_id': 'Whole Image Population - Peeling Factor-2'},'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Whole Image Population - Empty Ratio-2'},'backgroundColor': 'lightblue'},
+                    ],
                     style_data_conditional=[
                          {'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'},
                          {'if': {'filter_query': '{Whole Image Population - Peeling Factor-2} > 0.0001','column_id': 'Whole Image Population - Peeling Factor-2'},'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Whole Image Population - Empty Ratio-2} > 1','column_id': 'Whole Image Population - Empty Ratio-2'},'backgroundColor': 'red','color':'white'},
                          {'if': {'filter_query': '{Status} = Peeling','column_id': 'Status'},'backgroundColor': 'red','color':'white'}, 
                     ],
                     #hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
@@ -1097,11 +1124,25 @@ def image(request):
                     style_table={'overflowX': 'auto'},
                     style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
         'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_header_conditional=[
+                         {'if': {'column_id': 'Peeling Factor'},'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Whole Image Population - Peeling Factor-2 - Mean per Well' },'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Empty Ratio'  },'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Empty Area Population - Drug Interaction FOV - CV % per Well'},'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Spots - Number of Objects'},'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Hole Factor'},'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Normal FOV - Number of Objects'},'backgroundColor': 'lightblue'},
+                         
+                    ],
                     style_data_conditional=[
                          {'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'},
                          {'if': {'filter_query': '{Peeling Factor} > 0.0001','column_id': 'Peeling Factor'},'backgroundColor': 'red','color':'white'},
                          {'if': {'filter_query': '{Well Result} = Peeling','column_id': 'Well Result'},'backgroundColor': 'red','color':'white'},
-                         {'if': {'filter_query': '{Empty Area Population - Empty Image Region Area [µm²] - CV % per Well} <9500','column_id': 'Empty Area Population - Empty Image Region Area [µm²] - CV % per Well'},'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Whole Image Population - Peeling Factor-2 - Mean per Well}>0.0001','column_id': 'Whole Image Population - Peeling Factor-2 - Mean per Well' },'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Normal FOV - Number of Objects }<20000','column_id':'Normal FOV - Number of Objects'}, 'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Spots - Number of Objects}>1000','column_id':'Spots - Number of Objects'}, 'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Hole Factor }>1','column_id':'Hole Factor' }, 'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Empty Area Population - Drug Interaction FOV - CV % per Well}>9500','column_id':'Empty Area Population - Drug Interaction FOV - CV % per Well'}, 'backgroundColor': 'red','color':'white'},
                     ],
                     style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
                 ),
