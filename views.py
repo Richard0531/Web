@@ -930,7 +930,7 @@ def image(request):
                 dcc.Graph(id='output-image-upload', clear_on_unhover=True,config={"displaylogo": False, 'modeBarButtonsToAdd':['zoom2d','drawopenpath','drawrect', 'eraseshape','resetViews','resetGeo'], }),
                 ]),
              html.Div(children=[
-                html.Div(id='output-data-upload'),])
+                html.Div(id='output-data-upload'),]),
                 ])
                 ], style={'display': 'block'}, id='check-container2')
     app.layout = html.Div([
@@ -953,6 +953,9 @@ def image(request):
             multiple=True
         ),
         dbc.Row([dbc.Col(plot_upload)]),
+        dcc.Graph(id="indicator-graphic-2",config={"displaylogo": False,'toImageButtonOptions': {
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }})
         ])
     def parse_contents_plate(contents,columns):
         content_type, content_string = contents.split(',')
@@ -1020,8 +1023,9 @@ def image(request):
         df_plate['Well Result'] = ''
         df_plate['Status'] = ''
         df_plate['Color'] = ''
+        df_plate['Red Flag'] = ''
         for i in range(len(df_plate)):
-            if df_plate.at[i,'Peeling'] > 4:
+            if df_plate.at[i,'Peeling'] > 3:
                 df_plate.at[i,'Status'] = 'Fail'
             else:
                 df_plate.at[i,'Status'] = 'Pass'
@@ -1055,11 +1059,28 @@ def image(request):
                     else:
                         df_plate.at[i,'Well Result'] = 'Drug Interaction'
                         df_plate.at[i,'Color'] = '2'
+        for i in range(len(df_plate)):
+            if df_plate.at[i,'Well Result'] == 'Drug Interaction':
+                df_plate.at[i,'Status'] = 'Pass'
+            if df_plate.at[i,'Well Result'] == 'Drug Interaction': 
+                if df_plate.at[i,'Peeling'] >3:
+                    df_plate.at[i,'Red Flag'] = 'Yes'
+                else:
+                    df_plate.at[i,'Red Flag'] = "No"
+            else:
+                df_plate.at[i,'Red Flag'] = 'No'
+        
         df_plate['FOV']= 'Normal: '+ df_plate['Normal'].astype(str) + '\n' + 'DI: ' + df_plate['Drug Interaction'].astype(str) + '\n' + 'Peeling: ' + df_plate['Peeling'].astype(str)
         df_plate['FOV']=df_plate['FOV'] + '\n' + 'Well Result: ' + df_plate['Well Result'].astype(str)
         df_plate[columns_to_convert_plate] = df_plate[columns_to_convert_plate].astype(int)
+        df_drug = df_plate.pivot_table(index='Compound', columns='Status', aggfunc='size', fill_value=0).reset_index() 
+        if 'Fail' not in df_drug:
+            df_drug['Fail'] = 0
+        df_drug['Status'] = df_drug.apply(lambda row: 'Failed' if row['Fail'] > 4 else 'Passed', axis=1)
+        control = df_drug.query('Compound.str.startswith("Control")', engine="python")['Fail'].sum()
         
-        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues")
+        t = 'THIS PLATE HAS PASSED QC RULES' if control <5 else 'THIS PLATE HAS NOT PASSED QC RULES'
+        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title= t)
         fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'FOV'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>FOV: %{customdata}<br><extra></extra>'}])
         fig.update_layout(coloraxis_showscale=False)
         ###fig.update_traces(dict(showscale=True,colorscale = False))
@@ -1067,6 +1088,7 @@ def image(request):
         #fig.update_coloraxes(colorscale=[(1, colors[0]),(2, colors[1]),(3, colors[2]),])
         fig.update_layout(height=738,width=1291.5,)
         fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        
         fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
         for i in range(3,23,2):
             fig.add_vline(x=i+0.5,line_width=1)
@@ -1077,9 +1099,18 @@ def image(request):
         fig.add_shape(type="rect",x0=2.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
         fig.add_annotation(x=3, y=8,text='Control',showarrow=False,),fig.add_annotation(x=3, y=9,text='Control',showarrow=False,)
         for i in range(4,24,2):
-            fig.add_annotation(x=i+0.5, y=8,text=df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == i), 'Compound'].values[0],showarrow=False,)
+            d= df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == i),'Compound' ].values[0]
+            fig.add_annotation(x=i+0.5, y=8,text=d,showarrow=False,)
+            if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
+                fig.add_shape(type="rect",x0=i-0.5,y0=1.5,x1=i+1.5,y1=7.5, line=dict(color="Red",width = 4),)
         for i in range(4,24,2):
-            fig.add_annotation(x=i+0.5, y=9,text=df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == i), 'Compound'].values[0],showarrow=False,)
+            d= df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == i),'Compound' ].values[0]
+            fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,)
+            if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
+                fig.add_shape(type="rect",x0=i-0.5,y0=9.5,x1=i+1.5,y1=15.5,line=dict(color="Red",width=4))
+        for i in range(len(df_plate)):
+            if df_plate.at[i,'Red Flag'] == 'Yes':
+                fig.add_shape(type="rect",x0=df_plate.at[i,'Column']-0.5,y0=df_plate.at[i,'Row']-0.5,x1=df_plate.at[i,'Column']+0.5,y1=df_plate.at[i,'Row']+0.5,line=dict(color="Red",width=4,dash='dot'),)
         return html.Div([
             dcc.Graph(id="indicator-graphic", figure=fig, clear_on_unhover=True,config={"displaylogo": False}),
             dash_table.DataTable(
@@ -1104,15 +1135,18 @@ def image(request):
                     ],
                     #hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
                     export_format='xlsx',export_headers='display',
-                    style_table={'overflowX': 'auto'},
+                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
                     style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
         'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
                     style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
                 ),
             dash_table.DataTable(
+                    
                     df_plate.to_dict('records'),
-                    [{'name': i, 'id': i,"hideable":True} for i in df_plate.columns],
+                    columns = [{'name': i, 'id': i,"hideable":True} for i in df_plate.columns],
+                    id='datatable-interactivity',
                     page_size= 25,
+                    editable=True,
                     filter_action="native",
                     filter_options = {'case':'insensitive'},
                     sort_action="native",
@@ -1131,8 +1165,7 @@ def image(request):
                          {'if': {'column_id': 'Empty Area Population - Drug Interaction FOV - CV % per Well'},'backgroundColor': 'lightblue'},
                          {'if': {'column_id': 'Spots - Number of Objects'},'backgroundColor': 'lightblue'},
                          {'if': {'column_id': 'Hole Factor'},'backgroundColor': 'lightblue'},
-                         {'if': {'column_id': 'Normal FOV - Number of Objects'},'backgroundColor': 'lightblue'},
-                         
+                         {'if': {'column_id': 'Normal FOV - Number of Objects'},'backgroundColor': 'lightblue'},                    
                     ],
                     style_data_conditional=[
                          {'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'},
@@ -1145,6 +1178,26 @@ def image(request):
                          {'if': {'filter_query': '{Empty Area Population - Drug Interaction FOV - CV % per Well}>9500','column_id':'Empty Area Population - Drug Interaction FOV - CV % per Well'}, 'backgroundColor': 'red','color':'white'},
                     ],
                     style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                ),
+            dash_table.DataTable(
+                    df_drug.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in df_drug.columns], 
+                    page_size= 25,
+                    filter_action="native",
+                    filter_options = {'case':'insensitive'},
+                    sort_action="native",
+                    sort_mode="multi",
+                    page_action="native",
+                    hidden_columns=['Color','FOV'],
+                    #hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
+                    export_format='xlsx',export_headers='display',
+                    style_table={'overflowX': 'auto'},
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                    style_data_conditional=[
+                        {'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'},
+                    ],
                 ),
                 ])
     def image_contents(contents):
@@ -1192,6 +1245,14 @@ def image(request):
           #      image_contents(c, n) for c, n,  in
            #     zip(list_of_contents, list_of_names)]
             #return children
+    @app.callback(
+    Output("indicator-graphic-2", "figure"),
+    Input('datatable-interactivity', "derived_virtual_data"),
+    )
+    def update_graphs(data):
+        dff = pd.DataFrame(data)
+        fig = px.scatter(dff,x='Hole Factor', y='Peeling Factor')
+        return fig
     context = {}
     return render(request, 'catalog/image.html',context)    
 
