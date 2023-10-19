@@ -905,23 +905,25 @@ def crispr(request):
     return render(request, 'catalog/crispr.html',context)
 
 @login_required(login_url='/accounts/login/')
-def image(request):
-    
+def image(request): 
     app = DjangoDash('app_image',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
     file_upload = html.Div([
             html.Div([
             html.Div(children=[
                 dcc.Upload(id='upload-data1',children=html.Div([html.A('Select Drug Interaction FOV file')]),)],
-                style={'width': '20%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+                style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
             html.Div(children=[
                 dcc.Upload(id='upload-data2',children=html.Div([html.A('Select Whole Image population file')]),)],
-                style={'width': '20%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+                style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
             html.Div(children=[
                 dcc.Upload(id='upload-data3',children=html.Div([html.A('Select PlateResult file')]),)],
-                style={'width': '20%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+                style={'width': '16.8%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
             html.Div(children=[
-                dcc.Upload(id='upload-data4',children=html.Div([html.A('Select Spot file')]),)],
-                style={'width': '20%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+                dcc.Upload(id='upload-data4',children=html.Div([html.A('Select AOPI 1 file')]),)],
+                style={'width': '15%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            html.Div(children=[
+                dcc.Upload(id='upload-data5',children=html.Div([html.A('Select AOPI 2 file')]),)],
+                style={'width': '15%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
                 ]),
                 ], style={'display': 'block'}, id='check-container')
     plot_upload = html.Div([
@@ -929,7 +931,12 @@ def image(request):
             html.Div(children=[
                 dcc.Graph(id='output-image-upload', clear_on_unhover=True,config={"displaylogo": False, 'modeBarButtonsToAdd':['zoom2d','drawopenpath','drawrect', 'eraseshape','resetViews','resetGeo'], }),
                 ]),
-             html.Div(children=[
+            html.Div(children=[
+            dcc.Graph(id="indicator-graphic", clear_on_unhover=True,config={"displaylogo": False,'toImageButtonOptions': {
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+            ]),
+            html.Div(children=[
                 html.Div(id='output-data-upload'),]),
                 ])
                 ], style={'display': 'block'}, id='check-container2')
@@ -952,9 +959,6 @@ def image(request):
             },
             multiple=True
         ),
-        dcc.Graph(id="indicator-graphic", clear_on_unhover=True,config={"displaylogo": False,'toImageButtonOptions': {
-                                                                                       'format': 'svg', 'filename': 'custom_image',
-                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
         dbc.Row([dbc.Col(plot_upload)]),
         ])
     def parse_contents_plate(contents,columns):
@@ -965,6 +969,10 @@ def image(request):
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
         return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9,usecols = columns)
+    def parse_contents_AOPI(contents,columns):
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=8,usecols = columns)
     @app.callback(Output('output-data-upload', 'children'),
               [Input('upload-data1', 'contents'),
                Input('upload-data2', 'contents'),
@@ -1077,40 +1085,6 @@ def image(request):
         if 'Fail' not in df_drug:
             df_drug['Fail'] = 0
         df_drug['Status'] = df_drug.apply(lambda row: 'Failed' if row['Fail'] > 4 else 'Passed', axis=1)
-        control = df_drug.query('Compound.str.startswith("Control")', engine="python")['Fail'].sum()
-        
-        t = 'THIS PLATE HAS PASSED QC RULES' if control <5 else 'THIS PLATE HAS NOT PASSED QC RULES'
-        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title= t)
-        fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'FOV'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>FOV: %{customdata}<br><extra></extra>'}])
-        fig.update_layout(coloraxis_showscale=False)
-        ###fig.update_traces(dict(showscale=True,colorscale = False))
-        #colors = [ "rgb(255,255,255)", "rgb(201,235,255)", "rgb(9, 15,188 )",]
-        #fig.update_coloraxes(colorscale=[(1, colors[0]),(2, colors[1]),(3, colors[2]),])
-        fig.update_layout(height=738,width=1291.5,)
-        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
-        
-        fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
-        for i in range(3,23,2):
-            fig.add_vline(x=i+0.5,line_width=1)
-            fig.add_vline(x=i+1.5,line_width=1, line_dash="dash")
-        for i in range(2,15):
-            fig.add_hline(y=i+0.5,line_width=1, line_dash="dash") 
-        fig.add_shape(type="rect",x0=2.5, y0=5.5, x1=3.5, y1=6.5,fillcolor="Grey",),fig.add_shape(type="rect",x0=2.5, y0=13.5, x1=3.5, y1=14.5,fillcolor="Grey",)
-        fig.add_shape(type="rect",x0=2.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
-        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,),fig.add_annotation(x=3, y=9,text='Control',showarrow=False,)
-        for i in range(4,24,2):
-            d= df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == i),'Compound' ].values[0]
-            fig.add_annotation(x=i+0.5, y=8,text=d,showarrow=False,)
-            if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
-                fig.add_shape(type="rect",x0=i-0.5,y0=1.5,x1=i+1.5,y1=7.5, line=dict(color="Red",width = 4),)
-        for i in range(4,24,2):
-            d= df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == i),'Compound' ].values[0]
-            fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,)
-            if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
-                fig.add_shape(type="rect",x0=i-0.5,y0=9.5,x1=i+1.5,y1=15.5,line=dict(color="Red",width=4))
-        for i in range(len(df_plate)):
-            if df_plate.at[i,'Red Flag'] == 'Yes':
-                fig.add_shape(type="rect",x0=df_plate.at[i,'Column']-0.5,y0=df_plate.at[i,'Row']-0.5,x1=df_plate.at[i,'Column']+0.5,y1=df_plate.at[i,'Row']+0.5,line=dict(color="Red",width=4,dash='dot'),)
         return html.Div([
             dash_table.DataTable(
                     df.to_dict('records'),
@@ -1256,7 +1230,8 @@ def image(request):
         df = pd.DataFrame(data1)
         df_plate = pd.DataFrame(data2)
         df_drug = pd.DataFrame(data3)
-        control = df_drug.query('Compound.str.startswith("Control")', engine="python")['Fail'].sum()
+        filtered_df_drug = df_drug[df_drug['Compound'].str.contains('Control', case=False, regex=False)]
+        control = filtered_df_drug['Fail'].astype(int).sum()
         t = 'THIS PLATE HAS PASSED QC RULES' if control <5 else 'THIS PLATE HAS NOT PASSED QC RULES'
         fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title= t)
         fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'FOV'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>FOV: %{customdata}<br><extra></extra>'}])
