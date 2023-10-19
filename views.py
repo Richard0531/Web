@@ -952,10 +952,10 @@ def image(request):
             },
             multiple=True
         ),
-        dbc.Row([dbc.Col(plot_upload)]),
-        dcc.Graph(id="indicator-graphic-2",config={"displaylogo": False,'toImageButtonOptions': {
+        dcc.Graph(id="indicator-graphic", clear_on_unhover=True,config={"displaylogo": False,'toImageButtonOptions': {
                                                                                        'format': 'svg', 'filename': 'custom_image',
-                                                                                       'height': 700,'width': 1000,'scale': 1 }})
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+        dbc.Row([dbc.Col(plot_upload)]),
         ])
     def parse_contents_plate(contents,columns):
         content_type, content_string = contents.split(',')
@@ -1112,10 +1112,10 @@ def image(request):
             if df_plate.at[i,'Red Flag'] == 'Yes':
                 fig.add_shape(type="rect",x0=df_plate.at[i,'Column']-0.5,y0=df_plate.at[i,'Row']-0.5,x1=df_plate.at[i,'Column']+0.5,y1=df_plate.at[i,'Row']+0.5,line=dict(color="Red",width=4,dash='dot'),)
         return html.Div([
-            dcc.Graph(id="indicator-graphic", figure=fig, clear_on_unhover=True,config={"displaylogo": False}),
             dash_table.DataTable(
                     df.to_dict('records'),
                     [{'name': i, 'id': i,"hideable":True} for i in df.columns],
+                    id='datatable-interactivity-1',
                     fixed_columns={ 'data': 2},
                     page_size= 25,
                     filter_action="native",
@@ -1141,10 +1141,9 @@ def image(request):
                     style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
                 ),
             dash_table.DataTable(
-                    
                     df_plate.to_dict('records'),
                     columns = [{'name': i, 'id': i,"hideable":True} for i in df_plate.columns],
-                    id='datatable-interactivity',
+                    id='datatable-interactivity-2',
                     page_size= 25,
                     editable=True,
                     filter_action="native",
@@ -1182,6 +1181,8 @@ def image(request):
             dash_table.DataTable(
                     df_drug.to_dict('records'),
                     [{'name': i, 'id': i,"hideable":True} for i in df_drug.columns], 
+                    id='datatable-interactivity-3',
+                    editable=True,
                     page_size= 25,
                     filter_action="native",
                     filter_options = {'case':'insensitive'},
@@ -1246,12 +1247,44 @@ def image(request):
            #     zip(list_of_contents, list_of_names)]
             #return children
     @app.callback(
-    Output("indicator-graphic-2", "figure"),
-    Input('datatable-interactivity', "derived_virtual_data"),
+    Output("indicator-graphic", "figure"),
+    [Input('datatable-interactivity-1', "derived_virtual_data"),
+    Input('datatable-interactivity-2', "derived_virtual_data"),
+    Input('datatable-interactivity-3', "derived_virtual_data")],
     )
-    def update_graphs(data):
-        dff = pd.DataFrame(data)
-        fig = px.scatter(dff,x='Hole Factor', y='Peeling Factor')
+    def update_graphs(data1,data2,data3):
+        df = pd.DataFrame(data1)
+        df_plate = pd.DataFrame(data2)
+        df_drug = pd.DataFrame(data3)
+        control = df_drug.query('Compound.str.startswith("Control")', engine="python")['Fail'].sum()
+        t = 'THIS PLATE HAS PASSED QC RULES' if control <5 else 'THIS PLATE HAS NOT PASSED QC RULES'
+        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title= t)
+        fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'FOV'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>FOV: %{customdata}<br><extra></extra>'}])
+        fig.update_layout(coloraxis_showscale=False)
+        fig.update_layout(height=738,width=1291.5,)
+        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
+        for i in range(3,23,2):
+            fig.add_vline(x=i+0.5,line_width=1)
+            fig.add_vline(x=i+1.5,line_width=1, line_dash="dash")
+        for i in range(2,15):
+            fig.add_hline(y=i+0.5,line_width=1, line_dash="dash") 
+        fig.add_shape(type="rect",x0=2.5, y0=5.5, x1=3.5, y1=6.5,fillcolor="Grey",),fig.add_shape(type="rect",x0=2.5, y0=13.5, x1=3.5, y1=14.5,fillcolor="Grey",)
+        fig.add_shape(type="rect",x0=2.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
+        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,),fig.add_annotation(x=3, y=9,text='Control',showarrow=False,)
+        for i in range(4,24,2):
+            d= df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == i),'Compound' ].values[0]
+            fig.add_annotation(x=i+0.5, y=8,text=d,showarrow=False,)
+            if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
+                fig.add_shape(type="rect",x0=i-0.5,y0=1.5,x1=i+1.5,y1=7.5, line=dict(color="Red",width = 4),)
+        for i in range(4,24,2):
+            d= df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == i),'Compound' ].values[0]
+            fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,)
+            if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
+                fig.add_shape(type="rect",x0=i-0.5,y0=9.5,x1=i+1.5,y1=15.5,line=dict(color="Red",width=4))
+        for i in range(len(df_plate)):
+            if df_plate.at[i,'Red Flag'] == 'Yes':
+                fig.add_shape(type="rect",x0=df_plate.at[i,'Column']-0.5,y0=df_plate.at[i,'Row']-0.5,x1=df_plate.at[i,'Column']+0.5,y1=df_plate.at[i,'Row']+0.5,line=dict(color="Red",width=4,dash='dot'),) 
         return fig
     context = {}
     return render(request, 'catalog/image.html',context)    
