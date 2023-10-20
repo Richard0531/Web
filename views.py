@@ -940,6 +940,9 @@ def image(request):
                 html.Div(id='output-data-upload'),]),
                 ])
                 ], style={'display': 'block'}, id='check-container2')
+    aopi = html.Div([
+            html.Div([
+             html.Div(children=[html.Div(id='aopi-data-block'),]),]) ], style={'display': 'block'}, id='check-container-aopi')
     app.layout = html.Div([
         dbc.Row([dbc.Col(file_upload)]),
         dcc.Upload(
@@ -960,6 +963,7 @@ def image(request):
             multiple=True
         ),
         dbc.Row([dbc.Col(plot_upload)]),
+        dbc.Row([dbc.Col(aopi)]),
         ])
     def parse_contents_plate(contents,columns):
         content_type, content_string = contents.split(',')
@@ -969,10 +973,10 @@ def image(request):
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
         return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9,usecols = columns)
-    def parse_contents_AOPI(contents,columns):
+    def parse_contents_AOPI(contents):
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
-        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=8,usecols = columns)
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=8)
     @app.callback(Output('output-data-upload', 'children'),
               [Input('upload-data1', 'contents'),
                Input('upload-data2', 'contents'),
@@ -1079,7 +1083,7 @@ def image(request):
                 df_plate.at[i,'Red Flag'] = 'No'
         
         df_plate['FOV']= 'Normal: '+ df_plate['Normal'].astype(str) + '\n' + 'DI: ' + df_plate['Drug Interaction'].astype(str) + '\n' + 'Peeling: ' + df_plate['Peeling'].astype(str)
-        df_plate['FOV']=df_plate['FOV'] + '\n' + 'Well Result: ' + df_plate['Well Result'].astype(str)
+        df_plate['FOV']=df_plate['FOV'] + '<br>' + 'Well Result: ' + df_plate['Well Result'].astype(str)
         df_plate[columns_to_convert_plate] = df_plate[columns_to_convert_plate].astype(int)
         df_drug = df_plate.pivot_table(index='Compound', columns='Status', aggfunc='size', fill_value=0).reset_index() 
         if 'Fail' not in df_drug:
@@ -1214,25 +1218,54 @@ def image(request):
                 fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
                 return fig
         return {'data': [], 'layout': go.Layout()}
-        
-        #if list_of_contents is not None:
-         #   children = [
-          #      image_contents(c, n) for c, n,  in
-           #     zip(list_of_contents, list_of_names)]
-            #return children
+    @app.callback(Output('aopi-data-block', 'children'),
+              [Input('upload-data4', 'contents'),
+               Input('upload-data5', 'contents'),
+               ])
+    def aopi(aopi1,aopi2):
+        aopi1 = parse_contents_AOPI(aopi1)
+        aopi2 = parse_contents_AOPI(aopi2)
+        return html.Div([
+            dash_table.DataTable(
+                    aopi1.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in aopi1.columns],
+                    id='datatable-interactivity-aopi1',
+                    export_format='xlsx',export_headers='display',
+                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                    ),
+            dash_table.DataTable(
+                    aopi2.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in aopi2.columns],
+                    id='datatable-interactivity-aopi2',
+                    export_format='xlsx',export_headers='display',
+                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                    ),
+           ])
     @app.callback(
     Output("indicator-graphic", "figure"),
     [Input('datatable-interactivity-1', "derived_virtual_data"),
     Input('datatable-interactivity-2', "derived_virtual_data"),
-    Input('datatable-interactivity-3', "derived_virtual_data")],
+    Input('datatable-interactivity-3', "derived_virtual_data"),
+    Input('datatable-interactivity-aopi1', "derived_virtual_data"),
+    Input('datatable-interactivity-aopi2', "derived_virtual_data")]
     )
-    def update_graphs(data1,data2,data3):
+    def update_graphs(data1,data2,data3,aopi1,aopi2):
         df = pd.DataFrame(data1)
         df_plate = pd.DataFrame(data2)
         df_drug = pd.DataFrame(data3)
+        aopi1 = pd.DataFrame(aopi1)
+        aopi2 = pd.DataFrame(aopi2)
         filtered_df_drug = df_drug[df_drug['Compound'].str.contains('Control', case=False, regex=False)]
         control = filtered_df_drug['Fail'].astype(int).sum()
-        t = 'THIS PLATE HAS PASSED QC RULES' if control <5 else 'THIS PLATE HAS NOT PASSED QC RULES'
+        aopi = aopi1['Viability %'] + aopi2['Viability %']
+        aopi = round(aopi.mean() / 2,2)
+        t = 'AOPI Viability % : ' + str(aopi) + '<br>' + 'Failed Control Well : ' + str(control) +  '<br>'  +'THIS PLATE HAS PASSED QC RULES' if control <5 and aopi > 25  else 'AOPI Viability % : ' + str(aopi) +'<br>' +'Failed Control Well : ' + str(control)  + '<br>' + 'THIS PLATE HAS NOT PASSED QC RULES'
         fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title= t)
         fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'FOV'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>FOV: %{customdata}<br><extra></extra>'}])
         fig.update_layout(coloraxis_showscale=False)
