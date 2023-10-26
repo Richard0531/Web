@@ -936,6 +936,7 @@ def image(request):
             html.Div(children=[
                 dcc.Graph(id='output-image-upload', clear_on_unhover=True,config={"displaylogo": False, 'modeBarButtonsToAdd':['zoom2d','drawopenpath','drawrect', 'eraseshape','resetViews','resetGeo'], }),
                 ]),
+            html.Br(),
             html.Div(children=[
             dcc.Graph(id="indicator-graphic", clear_on_unhover=True,config={"displaylogo": False,'toImageButtonOptions': {
                                                                                        'format': 'svg', 'filename': 'custom_image',
@@ -976,7 +977,7 @@ def image(request):
     @app.callback(
         Output("download-pdf", 'data'),
         Input("export-button", 'n_clicks'),
-        Input('datatable-interactivity-3', "derived_virtual_data"),
+        State('datatable-interactivity-3', "derived_virtual_data"),
         prevent_initial_call=True
         )
     def export_to_pdf(n_clicks,data):
@@ -997,10 +998,12 @@ def image(request):
         table1.add_row(('Memphis, TN  38105','','',''))
         table1.add_hline()
         table1.add_hline()
+        table1.add_row((MultiColumn(4,align='||c||', data = ''),))
         table1.add_row((MultiColumn(4,align='||c||', data = LargeText(bold('Quality Control – Plate Processing Analysis'))),))
+        table1.add_row((MultiColumn(4,align='||c||', data = ''),))
         table1.add_hline()
         table_user = Tabular(' p{0.33\linewidth} p{0.33\linewidth} p{0.33\linewidth}|')
-        table_user.add_row(('MRN: ','Accession: ','Label here '))
+        table_user.add_row(('MRN/Plate#: ','Accession: ','Label here '))
         table_user.add_row(('','',''))
         table_user.add_row(('Name: ','Sample Date: ',''))
         with doc.create(Section('',numbering=False)):
@@ -1038,13 +1041,13 @@ def image(request):
             with doc.create(Figure(position='h!')) as plot:
                 with doc.create(SubFigure(
                         position='b',
-                        width=NoEscape(r'0.47\linewidth'))) as left_plot:
+                        width=NoEscape(r'0.49\linewidth'))) as left_plot:
                
                     left_plot.add_image('/opt/pub/temp/mysite/report_1.png',width=NoEscape(r'\linewidth'))
                     left_plot.add_caption('Plate Status')
                 with doc.create(SubFigure(
                         position='b',
-                        width=NoEscape(r'0.55\linewidth'))) as right_plot:
+                        width=NoEscape(r'0.53\linewidth'))) as right_plot:
                     right_plot.add_image('/opt/pub/temp/mysite/report_2.png',width=NoEscape(r'\linewidth'))
                     right_plot.add_caption('Plate Image')
         pdf_filename = 'output'
@@ -1159,6 +1162,12 @@ def image(request):
                     else:
                         df_plate.at[i,'Well Result'] = 'Drug Interaction'
                         df_plate.at[i,'Color'] = '2'
+        def change_value(row):
+            if 'Control' in row['Compound'] and row['Well Result'] == 'Drug Interaction':
+                return 'Normal'
+            else:
+                return row['Well Result']
+        df_plate['Well Result'] = df_plate.apply(change_value, axis=1)  
         for i in range(len(df_plate)):
             if df_plate.at[i,'Well Result'] == 'Drug Interaction':
                 df_plate.at[i,'Status'] = 'Pass'
@@ -1286,27 +1295,27 @@ def image(request):
         if list_of_contents is not None:
             contents = list_of_contents[-1]
             filenames = list_of_filename[-1]
+            t= 'Plate '+ filenames.split('.')[0]
             image = image_contents(contents)
             fig = go.Figure()
             if image is not None:
-                fig = px.imshow(image,height = 738,width=1291.5,title = filenames)
+                fig = px.imshow(image,height = 738,width=1291.5,title = t)
                 fig.update_xaxes(showticklabels=False)
                 fig.update_yaxes(showticklabels=False)
                 for i in range(1,22):
-                    fig.add_annotation(x=(((image.shape[1] /21) * i ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text=str(i+2),showarrow=False,)
+                    fig.add_annotation(x=(((image.shape[1] /21) * i ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text=str(i+2),showarrow=False,font=dict( size=20,))
                 cordinator = ['1','2','3','4','5','6','7','10','11','12','13','14','15']
                 for i in range(1,13):
-                    fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * i ) - (image.shape[0] /24)),text=cordinator[i],showarrow=False,) 
-                
+                    fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * i ) - (image.shape[0] /24)),text=cordinator[i],showarrow=False,font=dict( size=20,)) 
                 fig.add_shape(type="rect",x0=0,y0=0,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0],line=dict(color="Grey",width=3,))
                 for i in range(1,21,2):
                     fig.add_shape(type="rect",x0=((image.shape[1] /21) * i),y0=0,x1=((image.shape[1] /21) * (i+2)) ,y1=image.shape[0] ,line=dict(color="Grey",width=3,))
                 fig.add_shape(type="rect",x0=0,y0=0,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0] /2,line=dict(color="Grey",width=3,))
                 fig.update_traces(hoverinfo='none',hovertemplate=None)
                 fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
-                fig.update_layout(margin=dict(l=0, r=0, t=40, b=0),)
+                fig.update_layout(margin=dict(l=0, r=0, t=55, b=0),)
                 fig.update_layout( title_x=0.5)
-                fig.update_layout( title=dict(font =dict(size= 25)))
+                fig.update_layout( title=dict(font =dict(size= 35)))
                 file_path = os.path.join(os.getcwd(), 'report_2.png')
                 pio.write_image(fig, file_path, format='png')
                 return fig
@@ -1368,8 +1377,7 @@ def image(request):
         fig.update_layout(height=713,width=1065.5,)
         fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
         fig.update_layout(margin=dict(l=0, r=0, t=40, b=0),)
-        fig.update_layout(yaxis_title=None)
-        fig.update_layout(xaxis_title=None)
+        fig.update_layout(yaxis_title=None,xaxis_title=None,font=dict(size=20),xaxis=dict(tickmode='linear'),yaxis=dict(tickmode='linear'))
         fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
         for i in range(3,23,2):
             fig.add_vline(x=i+0.5,line_width=1)
@@ -1379,15 +1387,15 @@ def image(request):
         
         fig.add_shape(type="rect",x0=2.5, y0=5.5, x1=3.5, y1=6.5,fillcolor="Grey",),fig.add_shape(type="rect",x0=2.5, y0=13.5, x1=3.5, y1=14.5,fillcolor="Grey",)
         fig.add_shape(type="rect",x0=2.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
-        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,),fig.add_annotation(x=3, y=9,text='Control',showarrow=False,)
+        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,font=dict(size=15),textangle=-25),fig.add_annotation(x=3, y=9,text='Control',showarrow=False,font=dict(size=15),textangle=-25)
         for i in range(4,24,2):
             d= df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == i),'Compound' ].values[0]
-            fig.add_annotation(x=i+0.5, y=8,text=d,showarrow=False,)
+            fig.add_annotation(x=i+0.5, y=8,text=d,showarrow=False,font=dict(size=15),textangle=-25)
             if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
                 fig.add_shape(type="rect",x0=i-0.5,y0=1.5,x1=i+1.5,y1=7.5, line=dict(color="Red",width = 4),)
         for i in range(4,24,2):
             d= df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == i),'Compound' ].values[0]
-            fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,)
+            fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,font=dict(size=15),textangle=-25)
             if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
                 fig.add_shape(type="rect",x0=i-0.5,y0=9.5,x1=i+1.5,y1=15.5,line=dict(color="Red",width=4))
         for i in range(len(df_plate)):
@@ -1472,4 +1480,4 @@ class TestAutocomplete(autocomplete.Select2QuerySetView):
 
 
 
-# Create your views here.
+#izize=20)=16,)Create your views here.
