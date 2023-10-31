@@ -1164,10 +1164,10 @@ def image(request):
                         df_plate.at[i,'Color'] = '2'
         def change_value(row):
             if 'Control' in row['Compound'] and row['Well Result'] == 'Drug Interaction':
-                return 'Normal'
-            else:
-                return row['Well Result']
-        df_plate['Well Result'] = df_plate.apply(change_value, axis=1)  
+                row['Well Result'] = 'Normal'
+                row['Color'] = 1
+            return row
+        df_plate = df_plate.apply(change_value, axis=1)  
         for i in range(len(df_plate)):
             if df_plate.at[i,'Well Result'] == 'Drug Interaction':
                 df_plate.at[i,'Status'] = 'Pass'
