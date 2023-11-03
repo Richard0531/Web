@@ -978,13 +978,29 @@ def image(request):
         Output("download-pdf", 'data'),
         Input("export-button", 'n_clicks'),
         State('datatable-interactivity-3', "derived_virtual_data"),
+        State('datatable-interactivity-aopi1', "derived_virtual_data"),
+        State('datatable-interactivity-aopi2', "derived_virtual_data"),
         prevent_initial_call=True
         )
-    def export_to_pdf(n_clicks,data):
+    def export_to_pdf(n_clicks,data,aopi1,aopi2):
         df = pd.DataFrame(data)
+        aopi1 = pd.DataFrame(aopi1)
+        aopi2 = pd.DataFrame(aopi2)
+        aopi = aopi1['Viability %'] + aopi2['Viability %']
+        aopi = round(aopi.mean() / 2,2)
+        filtered_df_drug = df[df['Compound'].str.contains('Control', case=False, regex=False)]
+        control = filtered_df_drug['Fail'].astype(int).sum()
+        if control <5 and aopi > 25:
+            res = 'Passed'
+        elif control >5 and aopi > 25:
+            res = 'Failed_control'
+        elif control <5 and aopi < 25:
+            res = 'Failed_aopi'
+        else:
+            res = 'Failed'
         table2_data = df.iloc[:12]
         table3_data = df.iloc[12:]
-        geometry_options = {'tmargin':'0cm','lmargin':'0.5cm','rmargin':'0.5cm','paperwidth':'612pt','paperheight':'792pt'}
+        geometry_options = {'tmargin':'0.5cm','lmargin':'0.5cm','rmargin':'0.5cm','paperwidth':'612pt','paperheight':'792pt'}
         doc = Document(geometry_options=geometry_options)
         doc.append(NoEscape(r'\centering'))
         # 
@@ -1001,17 +1017,21 @@ def image(request):
         table1.add_row((MultiColumn(4,align='||c||', data = ''),))
         table1.add_row((MultiColumn(4,align='||c||', data = LargeText(bold('Quality Control – Plate Processing Analysis'))),))
         table1.add_row((MultiColumn(4,align='||c||', data = ''),))
-        table1.add_hline()
+        table1.add_hline() 
         table_user = Tabular(' p{0.33\linewidth} p{0.33\linewidth} p{0.33\linewidth}|')
         table_user.add_row(('MRN/Plate#: ','Accession: ','Label here '))
         table_user.add_row(('','',''))
-        table_user.add_row(('Name: ','Sample Date: ',''))
-        with doc.create(Section('',numbering=False)):
-            doc.append(table1)
+        table_user.add_row(('Name: ','QC Date: ',''))
+        table_user.add_row(('','',''))
+        #with doc.create(Section('',numbering=False)):
+        doc.append(table1)
+        doc.append(LineBreak())
+        #doc.append('No space here.' + r'\!')
         #with doc.create(MiniPage(align='c')):
             #doc.append(table1)
-        with doc.create(Section('',numbering=False)):
-            doc.append(table_user)
+        #with doc.create(Section('',numbering=False)):
+        doc.append(table_user)
+        doc.append(LineBreak())
         table2 = Tabular('|c|c|c|c|')
         table2.add_hline()
         table2.add_row(table2_data.columns)
@@ -1034,9 +1054,9 @@ def image(request):
         for i in range(0,12):
             table_comment.add_row('','','','','','','','','','','','')
         table_comment.add_hline()
-        with doc.create(Section('',numbering=False)):
-            with doc.create(Tabular('c c c',booktabs=False)) as tables:
-                tables.add_row(table2, table3, table_comment)
+        #with doc.create(Section('',numbering=False)):
+        with doc.create(Tabular('c c c',booktabs=False)) as tables:
+            tables.add_row(table2, table3, table_comment)
         with doc.create(Section('',numbering=False)):
             with doc.create(Figure(position='h!')) as plot:
                 with doc.create(SubFigure(
@@ -1050,6 +1070,16 @@ def image(request):
                         width=NoEscape(r'0.53\linewidth'))) as right_plot:
                     right_plot.add_image('/opt/pub/temp/mysite/report_2.png',width=NoEscape(r'\linewidth'))
                     right_plot.add_caption('Plate Image')
+        
+        with doc.create(Figure(position='h!')) as qc_picture:
+            if res == 'Passed':
+                qc_picture.add_image('/opt/pub/temp/mysite/Passed.png',width='250px')
+            elif res == 'Failed_control':
+                qc_picture.add_image('/opt/pub/temp/mysite/Failed-controlwells.png',width='250px')
+            elif res == 'Failed_aopi':
+                qc_picture.add_image('/opt/pub/temp/mysite/Failed-aopi.png',width='250px')
+            else:
+                qc_picture.add_image('/opt/pub/temp/mysite/Failed.png',width='250px')
         pdf_filename = 'output'
         doc.generate_pdf(pdf_filename, clean_tex=True)
         if n_clicks > 0:
