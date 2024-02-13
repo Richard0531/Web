@@ -1070,16 +1070,18 @@ def image(request):
                         width=NoEscape(r'0.53\linewidth'))) as right_plot:
                     right_plot.add_image('/opt/pub/temp/mysite/report_2.png',width=NoEscape(r'\linewidth'))
                     right_plot.add_caption('Plate Image')
-        
+        with doc.create(Figure(position='h!')) as index_picture:
+            with doc.create(SubFigure(position='h!')) as left:
+                left.add_image('/opt/pub/temp/mysite/Index2.PNG', width='240px')
         with doc.create(Figure(position='h!')) as qc_picture:
             if res == 'Passed':
-                qc_picture.add_image('/opt/pub/temp/mysite/Passed.png',width='250px')
+                qc_picture.add_image('/opt/pub/temp/mysite/Passed.png',width='160px')
             elif res == 'Failed_control':
-                qc_picture.add_image('/opt/pub/temp/mysite/Failed-controlwells.png',width='250px')
+                qc_picture.add_image('/opt/pub/temp/mysite/Failed-controlwells.png',width='220px')
             elif res == 'Failed_aopi':
-                qc_picture.add_image('/opt/pub/temp/mysite/Failed-aopi.png',width='250px')
+                qc_picture.add_image('/opt/pub/temp/mysite/Failed-aopi.png',width='220px')
             else:
-                qc_picture.add_image('/opt/pub/temp/mysite/Failed.png',width='250px')
+                qc_picture.add_image('/opt/pub/temp/mysite/Failed.png',width='220px')
         pdf_filename = 'output'
         doc.generate_pdf(pdf_filename, clean_tex=True)
         if n_clicks > 0:
@@ -1194,8 +1196,8 @@ def image(request):
                         df_plate.at[i,'Color'] = '2'
         def change_value(row):
             if 'Control' in row['Compound'] and row['Well Result'] == 'Drug Interaction':
-                row['Well Result'] = 'Normal'
-                row['Color'] = 1
+                row['Well Result'] = 'Peeling'
+                row['Color'] = 3
             return row
         df_plate = df_plate.apply(change_value, axis=1)  
         for i in range(len(df_plate)):
@@ -1212,6 +1214,8 @@ def image(request):
         df_plate['FOV']= 'Normal: '+ df_plate['Normal'].astype(str) + '\n' + 'DI: ' + df_plate['Drug Interaction'].astype(str) + '\n' + 'Peeling: ' + df_plate['Peeling'].astype(str)
         df_plate['FOV']=df_plate['FOV'] + '<br>' + 'Well Result: ' + df_plate['Well Result'].astype(str)
         df_plate[columns_to_convert_plate] = df_plate[columns_to_convert_plate].astype(int)
+        drug_order =  list(df_plate.loc[df_plate['Row'].isin([2,7,10]),]['Compound'].unique())
+        df_plate['Compound'] = pd.Categorical(df_plate['Compound'], categories=drug_order, ordered=True) 
         df_drug = df_plate.pivot_table(index='Compound', columns='Status', aggfunc='size', fill_value=0).reset_index() 
         if 'Fail' not in df_drug:
             df_drug['Fail'] = 0
@@ -1334,7 +1338,7 @@ def image(request):
                 fig.update_yaxes(showticklabels=False)
                 for i in range(1,22):
                     fig.add_annotation(x=(((image.shape[1] /21) * i ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text=str(i+2),showarrow=False,font=dict( size=20,))
-                cordinator = ['1','2','3','4','5','6','7','10','11','12','13','14','15']
+                cordinator = ['A','B','C','D','E','F','G','J','K','L','M','N','O']
                 for i in range(1,13):
                     fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * i ) - (image.shape[0] /24)),text=cordinator[i],showarrow=False,font=dict( size=20,)) 
                 fig.add_shape(type="rect",x0=0,y0=0,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0],line=dict(color="Grey",width=3,))
@@ -1394,6 +1398,7 @@ def image(request):
         df_drug = pd.DataFrame(data3)
         aopi1 = pd.DataFrame(aopi1)
         aopi2 = pd.DataFrame(aopi2)
+        cordinator = ['A','B','C','D','E','F','G','','','J','K','L','M','N','O'] 
         filtered_df_drug = df_drug[df_drug['Compound'].str.contains('Control', case=False, regex=False)]
         control = filtered_df_drug['Fail'].astype(int).sum()
         aopi = aopi1['Viability %'] + aopi2['Viability %']
@@ -1407,7 +1412,10 @@ def image(request):
         fig.update_layout(height=713,width=1065.5,)
         fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
         fig.update_layout(margin=dict(l=0, r=0, t=40, b=0),)
-        fig.update_layout(yaxis_title=None,xaxis_title=None,font=dict(size=20),xaxis=dict(tickmode='linear'),yaxis=dict(tickmode='linear'))
+        fig.update_layout(yaxis_title=None,xaxis_title=None,font=dict(size=20),xaxis=dict(tickmode='linear'),yaxis=dict(tickmode='linear',side="left"))
+        #fig.update_yaxes(ticktext=cordinator,tickvals=[2,3,4,5,6,7,8,9,10,11,12,13,14,15])
+        #fig.update_yaxes(title_text="<b>secondary</b> yaxis title", secondary_y=True)
+        #fig.update_layout(coloraxis_colorbar=dict(title=None, ticktext=cordinator, tickmode='array', ticks='outside'))
         fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
         for i in range(3,23,2):
             fig.add_vline(x=i+0.5,line_width=1)
@@ -1423,6 +1431,8 @@ def image(request):
             fig.add_annotation(x=i+0.5, y=8,text=d,showarrow=False,font=dict(size=15),textangle=-25)
             if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
                 fig.add_shape(type="rect",x0=i-0.5,y0=1.5,x1=i+1.5,y1=7.5, line=dict(color="Red",width = 4),)
+        for i in range(2,16):
+            fig.add_annotation(x=23+1, y=i,text=cordinator[i-1],showarrow=False,font=dict(size=20))
         for i in range(4,24,2):
             d= df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == i),'Compound' ].values[0]
             fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,font=dict(size=15),textangle=-25)
@@ -1435,8 +1445,230 @@ def image(request):
         pio.write_image(fig, file_path, format='png')
         return fig
     context = {}
-    return render(request, 'catalog/image.html',context)    
+    return render(request, 'catalog/image.html',context)
 
+@login_required(login_url='/accounts/login/')    
+def qc2(request): 
+    app = DjangoDash('app_qc2',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
+    file_upload = html.Div([
+            html.Div([
+            html.Div(children=[
+                dcc.Upload(id='upload-data1',children=html.Div([html.A('Select Drug Interaction FOV file')]),)],
+                style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            html.Div(children=[
+                dcc.Upload(id='upload-data2',children=html.Div([html.A('Select Whole Image population file')]),)],
+                style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            html.Div(children=[
+                dcc.Upload(id='upload-data3',children=html.Div([html.A('Select PlateResult file')]),)],
+                style={'width': '16.8%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+                ]),
+                ], style={'display': 'block'}, id='check-container')
+    plot_upload = html.Div([
+            html.Div([
+            html.Div(children=[
+                dcc.Graph(id='output-image-upload', clear_on_unhover=True,config={"displaylogo": False, 'modeBarButtonsToAdd':['zoom2d','drawopenpath','drawrect', 'eraseshape','resetViews','resetGeo'], }),
+                ]),
+            html.Br(),
+            html.Div(children=[
+            dcc.Graph(id="indicator-graphic", clear_on_unhover=True,config={"displaylogo": False,'toImageButtonOptions': {
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 1000,'width': 1429,'scale': 1 }}),
+            ]),
+            html.Div(children=[
+                html.Div(id='output-data-upload'),]),
+                ])
+                ], style={'display': 'block'}, id='check-container2')
+    app.layout = html.Div([
+        dbc.Row([dbc.Col(file_upload)]),
+        dcc.Upload(
+            id='upload-image',
+            children=html.Div([
+                html.A('Select Image (jpg,png)')
+            ]),
+            style={
+            'width': '80%',
+            'height': '30px',
+            'lineHeight': '30px',
+            'borderWidth': '1px',
+            'borderStyle': 'solid',
+            'borderRadius': '5px',
+            'textAlign': 'center',
+            'margin': '2px'
+            },
+            multiple=True
+        ),
+        dbc.Row([dbc.Col(plot_upload)]),
+        ])
+    def parse_contents_plate(contents):
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=8)
+    def parse_contents_columns(contents):
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9)
+    @app.callback(Output('output-data-upload', 'children'),
+              [Input('upload-data1', 'contents'),
+               Input('upload-data2', 'contents'),
+               Input('upload-data3', 'contents'),
+               ]
+              )
+    def update_output(contents1,contents2,contents3):
+        if contents1 is None or contents2 is None:
+            return 'Upload all files'
+        df2 = parse_contents_columns(contents2)
+        df1 = parse_contents_columns(contents1)
+        df3 = parse_contents_plate(contents3)
+        columns_to_convert = ['Row', 'Column','Field']
+        columns_to_convert_plate = ['Row', 'Column']
+        df1[columns_to_convert] = df1[columns_to_convert].astype(str)
+        df2[columns_to_convert] = df2[columns_to_convert].astype(str)
+        df3[columns_to_convert_plate] = df3[columns_to_convert_plate].astype(str)
+        df1['ID'] = df1['Row'] + df1['Column'] + df1['Field']
+        df1['Well ID'] = df1['Row'] + df1['Column']
+        df2['ID'] = df2['Row'] + df2['Column']
+        df3['Well ID'] = df3['Row'] + df3['Column']
+        df3['Status'] = ''  
+        df3['Color'] = ''
+        for i in range(len(df3)):
+            if df3.at[i,'Normal - Number of Objects'] == 1:
+                df3.at[i,'Status'] = 'Normal'
+                df3.at[i,'Color'] = '1'
+            elif df3.at[i,'Peeling - Number of Objects'] == 1:
+                df3.at[i,'Status'] = 'Peeling'
+                df3.at[i,'Color'] = '3'
+            elif df3.at[i,'Drug Interaction - Number of Objects'] == 1:
+                df3.at[i,'Status'] = 'Drug Interaction'
+                df3.at[i,'Color'] = '2'
+            else:
+                df3.at[i,'Status'] = 'Red Flag'
+                df3.at[i,'Color'] = '4'
+        return html.Div([
+            dash_table.DataTable(
+                    df1.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in df1.columns],
+                    id='datatable-interactivity-1',
+                    fixed_columns={ 'data': 2},
+                    page_size= 25,
+                    filter_action="native",
+                    filter_options = {'case':'insensitive'},
+                    sort_action="native",
+                    sort_mode="multi",
+                    page_action="native",
+                    export_format='xlsx',export_headers='display',
+                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                ),
+            dash_table.DataTable(
+                    df2.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in df2.columns],
+                    id='datatable-interactivity-2',
+                    fixed_columns={ 'data': 2},
+                    page_size= 25,
+                    filter_action="native",
+                    filter_options = {'case':'insensitive'},
+                    sort_action="native",
+                    sort_mode="multi",
+                    page_action="native",
+                    export_format='xlsx',export_headers='display',
+                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                ),
+            dash_table.DataTable(
+                    df3.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in df3.columns],
+                    id='datatable-interactivity-3',
+                    fixed_columns={ 'data': 2},
+                    page_size= 25,
+                    filter_action="native",
+                    filter_options = {'case':'insensitive'},
+                    sort_action="native",
+                    sort_mode="multi",
+                    page_action="native",
+                    export_format='xlsx',export_headers='display',
+                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                ),
+                ])
+    def image_contents(contents):
+        content_type, content_string = contents.split(',')
+        decoded_image = base64.b64decode(content_string)
+        nparr = np.frombuffer(decoded_image, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        return image
+    @app.callback(Output('output-image-upload', 'figure'),
+              Input('upload-image', 'contents'),
+              State('upload-image', 'filename'),
+              )
+    def update_image(list_of_contents,list_of_filename):
+        if list_of_contents is not None:
+            contents = list_of_contents[-1]
+            filenames = list_of_filename[-1]
+            t= 'Plate '+ filenames.split('.')[0]
+            image = image_contents(contents)
+            fig = go.Figure()
+            if image is not None:
+                fig = px.imshow(image,height = 738,width=1291.5,title = t)
+                fig.update_xaxes(showticklabels=False)
+                fig.update_yaxes(showticklabels=False)
+                for i in range(1,22):
+                    fig.add_annotation(x=(((image.shape[1] /21) * i ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text=str(i+2),showarrow=False,font=dict( size=20,))
+                cordinator = ['1','2','3','4','5','6','7','10','11','12','13','14','15']
+                for i in range(1,13):
+                    fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * i ) - (image.shape[0] /24)),text=cordinator[i],showarrow=False,font=dict( size=20,)) 
+                fig.add_shape(type="rect",x0=0,y0=0,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0],line=dict(color="Grey",width=3,))
+                for i in range(1,21,2):
+                    fig.add_shape(type="rect",x0=((image.shape[1] /21) * i),y0=0,x1=((image.shape[1] /21) * (i+2)) ,y1=image.shape[0] ,line=dict(color="Grey",width=3,))
+                fig.add_shape(type="rect",x0=0,y0=0,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0] /2,line=dict(color="Grey",width=3,))
+                fig.update_traces(hoverinfo='none',hovertemplate=None)
+                fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+                fig.update_layout(margin=dict(l=0, r=0, t=55, b=0),)
+                fig.update_layout( title_x=0.5)
+                fig.update_layout( title=dict(font =dict(size= 35)))
+                file_path = os.path.join(os.getcwd(), 'report_2.png')
+                pio.write_image(fig, file_path, format='png')
+                return fig
+        return {'data': [], 'layout': go.Layout()}
+    @app.callback(
+    Output("indicator-graphic", "figure"),
+    [Input('datatable-interactivity-3', "derived_virtual_data"),]
+    )    
+    def update_graphs(data1):
+        df = pd.DataFrame(data1)
+        columns_to_convert = ['Row', 'Column']
+        df[columns_to_convert] = df[columns_to_convert].astype(int)
+        discrete= {4: 'rgb(139,0,0)'}
+        fig = px.imshow(df.pivot('Row', 'Column', 'Color'),zmax = 4,zmin =1 ,color_continuous_scale="Blues")
+        fig.update_layout(coloraxis_showscale=False)
+        fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Status'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
+        fig.update_layout(height=713,width=1065.5,)
+        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        fig.update_layout(margin=dict(l=0, r=0, t=40, b=0),)
+        fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
+        for i in range(3,23,2):
+            fig.add_vline(x=i+0.5,line_width=1)
+            fig.add_vline(x=i+1.5,line_width=1, line_dash="dash")
+        for i in range(2,15):
+            fig.add_hline(y=i+0.5,line_width=1, line_dash="dash") 
+        fig.add_shape(type="rect",x0=2.5, y0=5.5, x1=3.5, y1=6.5,fillcolor="Grey",),fig.add_shape(type="rect",x0=2.5, y0=13.5, x1=3.5, y1=14.5,fillcolor="Grey",)
+        fig.add_shape(type="rect",x0=2.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
+        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,font=dict(size=15),textangle=-25),fig.add_annotation(x=3, y=9,text='Control',showarrow=False,font=dict(size=15),textangle=-25)
+        for i in range(4,24,2):
+            d= df.loc[(df['Row'] == 2) & (df['Column'] == i),'Compound' ].values[0]
+            fig.add_annotation(x=i+0.5, y=8,text=d,showarrow=False,font=dict(size=15),textangle=-25)
+        for i in range(4,24,2):
+            d= df.loc[(df['Row'] == 10) & (df['Column'] == i),'Compound' ].values[0]
+            fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,font=dict(size=15),textangle=-25)
+        return fig
+    context = {}
+    return render(request, 'catalog/qc2.html',context)               
+        
 
 from django.views import generic
 from django.contrib.auth.mixins import LoginRequiredMixin
