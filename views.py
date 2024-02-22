@@ -1452,15 +1452,15 @@ def qc2(request):
     app = DjangoDash('app_qc2',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
     file_upload = html.Div([
             html.Div([
-            html.Div(children=[
-                dcc.Upload(id='upload-data1',children=html.Div([html.A('Select Drug Interaction FOV file')]),)],
-                style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
-            html.Div(children=[
-                dcc.Upload(id='upload-data2',children=html.Div([html.A('Select Whole Image population file')]),)],
-                style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            #html.Div(children=[
+                #dcc.Upload(id='upload-data1',children=html.Div([html.A('Select Objects_Population - Cells')]),)],
+                #style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            #html.Div(children=[
+                #dcc.Upload(id='upload-data2',children=html.Div([html.A('Select Objects_Population - CyQuant')]),)],
+                #style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
             html.Div(children=[
                 dcc.Upload(id='upload-data3',children=html.Div([html.A('Select PlateResult file')]),)],
-                style={'width': '16.8%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+                style={'width': '80%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
                 ]),
                 ], style={'display': 'block'}, id='check-container')
     plot_upload = html.Div([
@@ -1508,28 +1508,29 @@ def qc2(request):
         decoded = base64.b64decode(content_string)
         return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9)
     @app.callback(Output('output-data-upload', 'children'),
-              [Input('upload-data1', 'contents'),
-               Input('upload-data2', 'contents'),
+              [
+               
                Input('upload-data3', 'contents'),
                ]
               )
-    def update_output(contents1,contents2,contents3):
-        if contents1 is None or contents2 is None:
-            return 'Upload all files'
-        df2 = parse_contents_columns(contents2)
-        df1 = parse_contents_columns(contents1)
+    def update_output(contents3):
+        #df2 = parse_contents_columns(contents2)
+        #df1 = parse_contents_columns(contents1)
         df3 = parse_contents_plate(contents3)
         columns_to_convert = ['Row', 'Column','Field']
         columns_to_convert_plate = ['Row', 'Column']
-        df1[columns_to_convert] = df1[columns_to_convert].astype(str)
-        df2[columns_to_convert] = df2[columns_to_convert].astype(str)
+        #df1[columns_to_convert] = df1[columns_to_convert].astype(str)
+        #df2[columns_to_convert] = df2[columns_to_convert].astype(str)
         df3[columns_to_convert_plate] = df3[columns_to_convert_plate].astype(str)
-        df1['ID'] = df1['Row'] + df1['Column'] + df1['Field']
-        df1['Well ID'] = df1['Row'] + df1['Column']
-        df2['ID'] = df2['Row'] + df2['Column']
+        #df1['ID'] = df1['Row'] + df1['Column'] + df1['Field']
+        #df1['Well ID'] = df1['Row'] + df1['Column']
+        #df2['ID'] = df2['Row'] + df2['Column']
         df3['Well ID'] = df3['Row'] + df3['Column']
+        df3 = df3.round(5)
         df3['Status'] = ''  
         df3['Color'] = ''
+        df3['Red Flag'] = ''
+        df3['Regression'] = ''
         for i in range(len(df3)):
             if df3.at[i,'Normal - Number of Objects'] == 1:
                 df3.at[i,'Status'] = 'Normal'
@@ -1543,41 +1544,14 @@ def qc2(request):
             else:
                 df3.at[i,'Status'] = 'Red Flag'
                 df3.at[i,'Color'] = '4'
+        for i in range(len(df3)):
+            if (df3.at[i,'Cells (global) - Regression A-B - Mean per Well'] > -1 and df3.at[i,'Cells (global) - Regression A-B - Mean per Well'] < 1 and df3.at[i,'Status'] != 'Normal' ):
+                df3.at[i,'Red Flag'] = 'Yes' 
+                df3.at[i,'Regression'] = df3.at[i,'Status']  + '\n' + 'Regression: '+df3.at[i,'Cells (global) - Regression A-B - Mean per Well'].astype(str)
+            else:
+                df3.at[i,'Red Flag'] = 'No' 
+                df3.at[i,'Regression'] = df3.at[i,'Status']  + '\n' + 'Regression: '+df3.at[i,'Cells (global) - Regression A-B - Mean per Well'].astype(str)
         return html.Div([
-            dash_table.DataTable(
-                    df1.to_dict('records'),
-                    [{'name': i, 'id': i,"hideable":True} for i in df1.columns],
-                    id='datatable-interactivity-1',
-                    fixed_columns={ 'data': 2},
-                    page_size= 25,
-                    filter_action="native",
-                    filter_options = {'case':'insensitive'},
-                    sort_action="native",
-                    sort_mode="multi",
-                    page_action="native",
-                    export_format='xlsx',export_headers='display',
-                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
-                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
-        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
-                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
-                ),
-            dash_table.DataTable(
-                    df2.to_dict('records'),
-                    [{'name': i, 'id': i,"hideable":True} for i in df2.columns],
-                    id='datatable-interactivity-2',
-                    fixed_columns={ 'data': 2},
-                    page_size= 25,
-                    filter_action="native",
-                    filter_options = {'case':'insensitive'},
-                    sort_action="native",
-                    sort_mode="multi",
-                    page_action="native",
-                    export_format='xlsx',export_headers='display',
-                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
-                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
-        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
-                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
-                ),
             dash_table.DataTable(
                     df3.to_dict('records'),
                     [{'name': i, 'id': i,"hideable":True} for i in df3.columns],
@@ -1589,6 +1563,7 @@ def qc2(request):
                     sort_action="native",
                     sort_mode="multi",
                     page_action="native",
+                    hidden_columns=['Regression'],
                     export_format='xlsx',export_headers='display',
                     style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
                     style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
@@ -1646,11 +1621,12 @@ def qc2(request):
         discrete= {4: 'rgb(139,0,0)'}
         fig = px.imshow(df.pivot('Row', 'Column', 'Color'),zmax = 4,zmin =1 ,color_continuous_scale="Blues")
         fig.update_layout(coloraxis_showscale=False)
-        fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Status'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
+        fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Regression'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
         fig.update_layout(height=713,width=1065.5,)
         fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
         fig.update_layout(margin=dict(l=0, r=0, t=40, b=0),)
         fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
+        fig.update_layout(font=dict(size=20),xaxis=dict(tickmode='linear'),yaxis=dict(tickmode='linear',side="left"))
         for i in range(3,23,2):
             fig.add_vline(x=i+0.5,line_width=1)
             fig.add_vline(x=i+1.5,line_width=1, line_dash="dash")
@@ -1665,6 +1641,9 @@ def qc2(request):
         for i in range(4,24,2):
             d= df.loc[(df['Row'] == 10) & (df['Column'] == i),'Compound' ].values[0]
             fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,font=dict(size=15),textangle=-25)
+        for i in range(len(df)):
+            if df.at[i,'Red Flag'] == 'Yes':
+                fig.add_shape(type="rect",x0=df.at[i,'Column']-0.5,y0=df.at[i,'Row']-0.5,x1=df.at[i,'Column']+0.5,y1=df.at[i,'Row']+0.5,line=dict(color="Red",width=4,dash='dot'),) 
         return fig
     context = {}
     return render(request, 'catalog/qc2.html',context)               
