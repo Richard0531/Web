@@ -49,6 +49,12 @@ import dash_html_components as html
 from pylatex import *
 import plotly.io as pio
 from pylatex.utils import bold, NoEscape
+import anndata
+import scanpy as sc
+from scipy.sparse import csr_matrix, save_npz
+from scipy.sparse import load_npz
+import matplotlib.pyplot as plt
+
 @login_required(login_url='/accounts/login/')
 def index(request):
     
@@ -1045,7 +1051,8 @@ def image(request):
         table3.add_hline()
         for _, row in table3_data.iterrows():
             table3.add_row(row)
-        table3.add_row(('','','',''))
+        if table3_data.shape[0] == 11:
+            table3.add_row(('','','',''))
         table3.add_hline()
         table_comment = Tabular('|c c c c c c c c c c c c|')
         table_comment.add_hline()
@@ -1336,14 +1343,18 @@ def image(request):
                 fig = px.imshow(image,height = 738,width=1291.5,title = t)
                 fig.update_xaxes(showticklabels=False)
                 fig.update_yaxes(showticklabels=False)
+                
                 for i in range(1,22):
                     fig.add_annotation(x=(((image.shape[1] /21) * i ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text=str(i+2),showarrow=False,font=dict( size=20,))
+                
                 cordinator = ['A','B','C','D','E','F','G','J','K','L','M','N','O']
                 for i in range(1,13):
                     fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * i ) - (image.shape[0] /24)),text=cordinator[i],showarrow=False,font=dict( size=20,)) 
                 fig.add_shape(type="rect",x0=0,y0=0,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0],line=dict(color="Grey",width=3,))
+                '''
                 for i in range(1,21,2):
                     fig.add_shape(type="rect",x0=((image.shape[1] /21) * i),y0=0,x1=((image.shape[1] /21) * (i+2)) ,y1=image.shape[0] ,line=dict(color="Grey",width=3,))
+                '''
                 fig.add_shape(type="rect",x0=0,y0=0,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0] /2,line=dict(color="Grey",width=3,))
                 fig.update_traces(hoverinfo='none',hovertemplate=None)
                 fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
@@ -1354,6 +1365,7 @@ def image(request):
                 pio.write_image(fig, file_path, format='png')
                 return fig
         return {'data': [], 'layout': go.Layout()}
+    
     @app.callback(Output('aopi-data-block', 'children'),
               [Input('upload-data4', 'contents'),
                Input('upload-data5', 'contents'),
@@ -1384,14 +1396,15 @@ def image(request):
                     style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
                     ),
            ])
+    
     @app.callback(
     Output("indicator-graphic", "figure"),
     [Input('datatable-interactivity-1', "derived_virtual_data"),
     Input('datatable-interactivity-2', "derived_virtual_data"),
     Input('datatable-interactivity-3', "derived_virtual_data"),
     Input('datatable-interactivity-aopi1', "derived_virtual_data"),
-    Input('datatable-interactivity-aopi2', "derived_virtual_data")]
-    )
+    Input('datatable-interactivity-aopi2', "derived_virtual_data")
+    ])
     def update_graphs(data1,data2,data3,aopi1,aopi2):
         df = pd.DataFrame(data1)
         df_plate = pd.DataFrame(data2)
@@ -1405,6 +1418,7 @@ def image(request):
         aopi = round(aopi.mean() / 2,2)
         t = 'AOPI Viability %:' + str(aopi)+ ' '  + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' if control <5 and aopi > 25  else 'AOPI Viability %:' + str(aopi) + " " +'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
         fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title= t)
+        #fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues")
         fig.update_layout( title_x=0.5)
         fig.update_layout( title=dict(font =dict(size= 25)))
         fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'FOV'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>FOV: %{customdata}<br><extra></extra>'}])
@@ -1413,10 +1427,13 @@ def image(request):
         fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
         fig.update_layout(margin=dict(l=0, r=0, t=40, b=0),)
         fig.update_layout(yaxis_title=None,xaxis_title=None,font=dict(size=20),xaxis=dict(tickmode='linear'),yaxis=dict(tickmode='linear',side="left"))
-        #fig.update_yaxes(ticktext=cordinator,tickvals=[2,3,4,5,6,7,8,9,10,11,12,13,14,15])
-        #fig.update_yaxes(title_text="<b>secondary</b> yaxis title", secondary_y=True)
-        #fig.update_layout(coloraxis_colorbar=dict(title=None, ticktext=cordinator, tickmode='array', ticks='outside'))
-        fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
+        fig.update_yaxes(ticktext=cordinator,tickvals=[2,3,4,5,6,7,8,9,10,11,12,13,14,15])
+        fig.update_yaxes(title_text="<b>secondary</b> yaxis title", secondary_y=True)
+        fig.update_layout(coloraxis_colorbar=dict(title=None, ticktext=cordinator, tickmode='array', ticks='outside'))
+        if '2' in df['Column'].values:
+            fig.add_shape(type="rect",x0=1.5,y0=1.5,x1=23.5,y1=15.5)
+        else:
+            fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
         for i in range(3,23,2):
             fig.add_vline(x=i+0.5,line_width=1)
             fig.add_vline(x=i+1.5,line_width=1, line_dash="dash")
@@ -1424,8 +1441,13 @@ def image(request):
             fig.add_hline(y=i+0.5,line_width=1, line_dash="dash") 
         
         fig.add_shape(type="rect",x0=2.5, y0=5.5, x1=3.5, y1=6.5,fillcolor="Grey",),fig.add_shape(type="rect",x0=2.5, y0=13.5, x1=3.5, y1=14.5,fillcolor="Grey",)
-        fig.add_shape(type="rect",x0=2.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
-        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,font=dict(size=15),textangle=-25),fig.add_annotation(x=3, y=9,text='Control',showarrow=False,font=dict(size=15),textangle=-25)
+        if '2' in df['Column'].astype(str).values:
+            fig.add_vline(x=2.5,line_width=1)
+            fig.add_shape(type="rect",x0=1.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
+        else:
+            fig.add_shape(type="rect",x0=2.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
+        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,font=dict(size=15),textangle=-25),
+        fig.add_annotation(x=3, y=9,text='Control',showarrow=False,font=dict(size=15),textangle=-25)
         for i in range(4,24,2):
             d= df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == i),'Compound' ].values[0]
             fig.add_annotation(x=i+0.5, y=8,text=d,showarrow=False,font=dict(size=15),textangle=-25)
@@ -1526,11 +1548,250 @@ def qc2(request):
         #df1['Well ID'] = df1['Row'] + df1['Column']
         #df2['ID'] = df2['Row'] + df2['Column']
         df3['Well ID'] = df3['Row'] + df3['Column']
+        #df3['Peeling Ratio'] = df3['Emptyness - Empty CyQuant AREA Area [µm²] - Sum per Well'] / df3['CELL AREA'] 
+        df3['Var1'] = abs(df3['Emptyness - Empty CyQuant Region Centroid X in Well [µm] - Mean per Well'])+abs(df3['Emptyness - Empty CyQuant Region Centroid Y in Well [µm] - Mean per Well'])
+        df3['Var2'] = df3['Peeled Layer - Peeled Region Area [µm²] - Max per Well'] / df3['Cell Layer - Cell Region Area [µm²] - Max per Well']
+        df3['Status'] = ''
+        df3['Color'] = ''
+        df3 = round(df3,5)
+        #df3['Red Flag'] = ''
+        #df3['Regression'] = ''
+        for i in range(len(df3)):
+            if df3.at[i,'Whole Image (global) - Emptyness (global) overlap Overlap [%] - Mean per Well'] > 35 and (df3.at[i,'Var1'] > 180 and df3.at[i,'Var1'] < 250 ) and df3.at[i,'Var2'] > 1 :
+                df3.at[i,'Status'] = 'Fail'
+                df3.at[i,'Color'] = '4'
+            elif df3.at[i,'Whole Image (global) - Emptyness (global) overlap Overlap [%] - Mean per Well'] < 35 and (df3.at[i,'Var1'] > 250 and df3.at[i,'Var1'] < 500 ) and df3.at[i,'Var2'] < 1:
+                df3.at[i,'Status'] = 'Pass'
+                df3.at[i,'Color'] = '1'
+            else:
+                df3.at[i,'Status'] = 'Pass'
+                df3.at[i,'Color'] = '1'
+                
+        '''
+        for i in range(len(df3)):
+            if df3.at[i,'Normal - Number of Objects'] == 1:
+                df3.at[i,'Status'] = 'Normal'
+                df3.at[i,'Color'] = '1'
+            elif df3.at[i,'Peeling - Number of Objects'] == 1:
+                df3.at[i,'Status'] = 'Peeling'
+                df3.at[i,'Color'] = '3'
+            elif df3.at[i,'Drug Interaction - Number of Objects'] == 1:
+                df3.at[i,'Status'] = 'Drug Interaction'
+                df3.at[i,'Color'] = '2'
+            else:
+                df3.at[i,'Status'] = 'Normal'
+                df3.at[i,'Color'] = '1'
+        
+        for i in range(len(df3)):
+            if (df3.at[i,'Cells (global) - Regression A-B - Mean per Well'] > -1 and df3.at[i,'Cells (global) - Regression A-B - Mean per Well'] < 1 and df3.at[i,'Status'] == 'Peeling' ):
+                df3.at[i,'Red Flag'] = 'Yes' 
+                df3.at[i,'Regression'] = df3.at[i,'Status']  + '\n' + 'Regression: '+df3.at[i,'Cells (global) - Regression A-B - Mean per Well'].astype(str) + '\n' + 'Peeling Ratio: '+ df3.at[i,'Peeling Ratio'].astype(str)
+            else:
+                df3.at[i,'Red Flag'] = 'No' 
+                df3.at[i,'Regression'] = df3.at[i,'Status']  + '\n' + 'Regression: '+df3.at[i,'Cells (global) - Regression A-B - Mean per Well'].astype(str) + '\n' + 'Peeling Ratio: '+ df3.at[i,'Peeling Ratio'].astype(str)
+        '''
+        return html.Div([
+            dash_table.DataTable(
+                    df3.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in df3.columns],
+                    id='datatable-interactivity-3',
+                    fixed_columns={ 'data': 2},
+                    page_size= 25,
+                    editable=True,
+                    filter_action="native",
+                    filter_options = {'case':'insensitive'},
+                    sort_action="native",
+                    sort_mode="multi",
+                    page_action="native",
+                    #hidden_columns=['Regression'],
+                    export_format='xlsx',export_headers='display',
+                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                ),
+                ])
+    def image_contents(contents):
+        content_type, content_string = contents.split(',')
+        decoded_image = base64.b64decode(content_string)
+        nparr = np.frombuffer(decoded_image, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        return image
+    @app.callback(Output('output-image-upload', 'figure'),
+              Input('upload-image', 'contents'),
+              State('upload-image', 'filename'),
+              )
+    def update_image(list_of_contents,list_of_filename):
+        if list_of_contents is not None:
+            contents = list_of_contents[-1]
+            filenames = list_of_filename[-1]
+            t= 'Plate '+ filenames.split('.')[0]
+            image = image_contents(contents)
+            fig = go.Figure()
+            if image is not None:
+                fig = px.imshow(image,height = 738,width=1291.5,title = t)
+                fig.update_xaxes(showticklabels=False)
+                fig.update_yaxes(showticklabels=False)
+                for i in range(1,22):
+                    fig.add_annotation(x=(((image.shape[1] /21) * i ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text=str(i+2),showarrow=False,font=dict( size=20,))
+                cordinator = ['1','2','3','4','5','6','7','10','11','12','13','14','15']
+                for i in range(1,13):
+                    fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * i ) - (image.shape[0] /24)),text=cordinator[i],showarrow=False,font=dict( size=20,)) 
+                fig.add_shape(type="rect",x0=0,y0=0,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0],line=dict(color="Grey",width=3,))
+                for i in range(1,21,2):
+                    fig.add_shape(type="rect",x0=((image.shape[1] /21) * i),y0=0,x1=((image.shape[1] /21) * (i+2)) ,y1=image.shape[0] ,line=dict(color="Grey",width=3,))
+                fig.add_shape(type="rect",x0=0,y0=0,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0] /2,line=dict(color="Grey",width=3,))
+                fig.update_traces(hoverinfo='none',hovertemplate=None)
+                fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+                fig.update_layout(margin=dict(l=0, r=0, t=55, b=0),)
+                fig.update_layout( title_x=0.5)
+                fig.update_layout( title=dict(font =dict(size= 35)))
+                file_path = os.path.join(os.getcwd(), 'report_2.png')
+                pio.write_image(fig, file_path, format='png')
+                return fig
+        return {'data': [], 'layout': go.Layout()}
+    @app.callback(
+    Output("indicator-graphic", "figure"),
+    [Input('datatable-interactivity-3', "derived_virtual_data"),]
+    )    
+    def update_graphs(data1):
+        df = pd.DataFrame(data1)
+        columns_to_convert = ['Row', 'Column']
+        df[columns_to_convert] = df[columns_to_convert].astype(int)
+        discrete= {4: 'rgb(139,0,0)'}
+        fig = px.imshow(df.pivot('Row', 'Column', 'Color'),zmax = 4,zmin =1 ,color_continuous_scale="Blues")
+        fig.update_layout(coloraxis_showscale=False)
+        fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Well ID'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Well ID: %{customdata}<br><extra></extra>'}])
+        fig.update_layout(height=713,width=1065.5,)
+        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        fig.update_layout(margin=dict(l=0, r=0, t=40, b=0),)
+        fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
+        fig.update_layout(font=dict(size=20),xaxis=dict(tickmode='linear'),yaxis=dict(tickmode='linear',side="left"))
+        for i in range(3,23,2):
+            fig.add_vline(x=i+0.5,line_width=1)
+            fig.add_vline(x=i+1.5,line_width=1, line_dash="dash")
+        for i in range(2,15):
+            fig.add_hline(y=i+0.5,line_width=1, line_dash="dash") 
+        fig.add_shape(type="rect",x0=2.5, y0=5.5, x1=3.5, y1=6.5,fillcolor="Grey",),fig.add_shape(type="rect",x0=2.5, y0=13.5, x1=3.5, y1=14.5,fillcolor="Grey",)
+        fig.add_shape(type="rect",x0=2.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
+        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,font=dict(size=15),textangle=-25),fig.add_annotation(x=3, y=9,text='Control',showarrow=False,font=dict(size=15),textangle=-25)
+        for i in range(4,24,2):
+            d= df.loc[(df['Row'] == 2) & (df['Column'] == i),'Compound' ].values[0]
+            fig.add_annotation(x=i+0.5, y=8,text=d,showarrow=False,font=dict(size=15),textangle=-25)
+        for i in range(4,24,2):
+            d= df.loc[(df['Row'] == 10) & (df['Column'] == i),'Compound' ].values[0]
+            fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,font=dict(size=15),textangle=-25)
+        #for i in range(len(df)):
+        #    if df.at[i,'Red Flag'] == 'Yes':
+        #        fig.add_shape(type="rect",x0=df.at[i,'Column']-0.5,y0=df.at[i,'Row']-0.5,x1=df.at[i,'Column']+0.5,y1=df.at[i,'Row']+0.5,line=dict(color="Red",width=4,dash='dot'),) 
+        return fig
+    context = {}
+    return render(request, 'catalog/qc2.html',context)   
+@login_required(login_url='/accounts/login/')    
+def qc3(request): 
+    app = DjangoDash('app_qc3',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
+    file_upload = html.Div([
+            html.Div([
+            #html.Div(children=[
+                #dcc.Upload(id='upload-data1',children=html.Div([html.A('Select Objects_Population - Cells')]),)],
+                #style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            #html.Div(children=[
+                #dcc.Upload(id='upload-data2',children=html.Div([html.A('Select Objects_Population - CyQuant')]),)],
+                #style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            html.Div(children=[
+                dcc.Upload(id='upload-data3',children=html.Div([html.A('Select PlateResult file')]),)],
+                style={'width': '80%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+                ]),
+                ], style={'display': 'block'}, id='check-container')
+    plot_upload = html.Div([
+            html.Div([
+            html.Div(children=[
+                dcc.Graph(id='output-image-upload', clear_on_unhover=True,config={"displaylogo": False, 'modeBarButtonsToAdd':['zoom2d','drawopenpath','drawrect', 'eraseshape','resetViews','resetGeo'], }),
+                ]),
+            html.Br(),
+            html.Div(children=[
+            dcc.Graph(id="indicator-graphic", clear_on_unhover=True,config={"displaylogo": False,'toImageButtonOptions': {
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 1000,'width': 1429,'scale': 1 }}),
+            ]),
+            html.Div(children=[
+                html.Div(id='output-data-upload'),]),
+                ])
+                ], style={'display': 'block'}, id='check-container2')
+    app.layout = html.Div([
+        dbc.Row([dbc.Col(file_upload)]),
+        dcc.Upload(
+            id='upload-image',
+            children=html.Div([
+                html.A('Select Image (jpg,png)')
+            ]),
+            style={
+            'width': '80%',
+            'height': '30px',
+            'lineHeight': '30px',
+            'borderWidth': '1px',
+            'borderStyle': 'solid',
+            'borderRadius': '5px',
+            'textAlign': 'center',
+            'margin': '2px'
+            },
+            multiple=True
+        ),
+        dbc.Row([dbc.Col(plot_upload)]),
+        ])
+    def parse_contents_plate(contents):
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=8)
+    def parse_contents_columns(contents):
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9)
+    @app.callback(Output('output-data-upload', 'children'),
+              [
+               
+               Input('upload-data3', 'contents'),
+               ]
+              )
+    def update_output(contents3):
+        #df2 = parse_contents_columns(contents2)
+        #df1 = parse_contents_columns(contents1)
+        df3 = parse_contents_plate(contents3)
+        columns_to_convert = ['Row', 'Column','Field']
+        columns_to_convert_plate = ['Row', 'Column']
+        #df1[columns_to_convert] = df1[columns_to_convert].astype(str)
+        #df2[columns_to_convert] = df2[columns_to_convert].astype(str)
+        df3[columns_to_convert_plate] = df3[columns_to_convert_plate].astype(str)
+        #df1['ID'] = df1['Row'] + df1['Column'] + df1['Field']
+        #df1['Well ID'] = df1['Row'] + df1['Column']
+        #df2['ID'] = df2['Row'] + df2['Column']
+        df3['Well ID'] = df3['Row'] + df3['Column']
         df3 = df3.round(5)
         df3['Status'] = ''  
         df3['Color'] = ''
-        df3['Red Flag'] = ''
-        df3['Regression'] = ''
+        df3['AbsSum of XY Empty'] = abs(df3['Emptyness - Empty CyQuant Region Centroid X in Well [µm] - Mean per Well']) + abs(df3['Emptyness - Empty CyQuant Region Centroid Y in Well [µm] - Mean per Well'])
+        df3['AbsSum of XY Severe'] = (abs(df3['Severe Peeling - Empty CyQuant Region Centroid X in Well [µm] - Mean per Well']) * abs(df3['Severe Peeling - Empty CyQuant Region Centroid X in Well [µm] - CV % per Well'])) + (abs(df3['Severe Peeling - Empty CyQuant Region Centroid Y in Well [µm] - Mean per Well']) * abs(df3['Severe Peeling - Empty CyQuant Region Centroid Y in Well [µm] - CV % per Well']))
+        df3['AbsSum of XY Minor'] = abs(df3['Minor Peeling - Empty CyQuant Region Centroid X in Well [µm] - Mean per Well'])*abs(df3['Minor Peeling - Empty CyQuant Region Centroid X in Well [µm] - CV % per Well']) + abs(df3['Minor Peeling - Empty CyQuant Region Centroid Y in Well [µm] - Mean per Well']) *abs(df3['Minor Peeling - Empty CyQuant Region Centroid Y in Well [µm] - CV % per Well'])
+        df3['AbsSum of XY Normal'] = abs(df3['Normal - Empty CyQuant Region Centroid X in Well [µm] - Mean per Well'])*abs(df3['Normal - Empty CyQuant Region Centroid X in Well [µm] - CV % per Well']) + abs(df3['Normal - Empty CyQuant Region Centroid Y in Well [µm] - Mean per Well'])*abs(df3['Normal - Empty CyQuant Region Centroid Y in Well [µm] - CV % per Well'])
+        
+        df3['XY Sum Severe&Normal']= df3['AbsSum of XY Severe'] + df3['AbsSum of XY Normal']
+        df3['XY sum Severe&Normal divided by AbsSum of XY Empty'] = df3['XY Sum Severe&Normal'] / df3['AbsSum of XY Empty']
+        df3 = df3.round(5)
+        for i in range(len(df3)):
+            if df3.at[i,'Whole Image (global) - Emptyness (global) overlap Overlap [%] - Mean per Well'] > 90:
+                df3.at[i,'Status'] = 'Fail'
+                df3.at[i,'Color'] = '4'
+            elif df3.at[i,'XY sum Severe&Normal divided by AbsSum of XY Empty'] > 300 and df3.at[i,'AbsSum of XY Severe'] > 50000:
+                if df3.at[i,'AbsSum of XY Empty'] >450:
+                    df3.at[i,'Status'] = 'Red Flag'
+                    df3.at[i,'Color'] = '2'
+                else:
+                    df3.at[i,'Status'] = 'Pass'
+                    df3.at[i,'Color'] = '1'
+            else:
+                df3.at[i,'Status'] = 'Fail'
+                df3.at[i,'Color'] = '4'
+        '''
         for i in range(len(df3)):
             if df3.at[i,'Normal - Number of Objects'] == 1:
                 df3.at[i,'Status'] = 'Normal'
@@ -1544,13 +1805,7 @@ def qc2(request):
             else:
                 df3.at[i,'Status'] = 'Red Flag'
                 df3.at[i,'Color'] = '4'
-        for i in range(len(df3)):
-            if (df3.at[i,'Cells (global) - Regression A-B - Mean per Well'] > -1 and df3.at[i,'Cells (global) - Regression A-B - Mean per Well'] < 1 and df3.at[i,'Status'] != 'Normal' ):
-                df3.at[i,'Red Flag'] = 'Yes' 
-                df3.at[i,'Regression'] = df3.at[i,'Status']  + '\n' + 'Regression: '+df3.at[i,'Cells (global) - Regression A-B - Mean per Well'].astype(str)
-            else:
-                df3.at[i,'Red Flag'] = 'No' 
-                df3.at[i,'Regression'] = df3.at[i,'Status']  + '\n' + 'Regression: '+df3.at[i,'Cells (global) - Regression A-B - Mean per Well'].astype(str)
+        '''
         return html.Div([
             dash_table.DataTable(
                     df3.to_dict('records'),
@@ -1621,7 +1876,7 @@ def qc2(request):
         discrete= {4: 'rgb(139,0,0)'}
         fig = px.imshow(df.pivot('Row', 'Column', 'Color'),zmax = 4,zmin =1 ,color_continuous_scale="Blues")
         fig.update_layout(coloraxis_showscale=False)
-        fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Regression'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
+        fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Status'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Status: %{customdata}<br><extra></extra>'}])
         fig.update_layout(height=713,width=1065.5,)
         fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
         fig.update_layout(margin=dict(l=0, r=0, t=40, b=0),)
@@ -1641,14 +1896,198 @@ def qc2(request):
         for i in range(4,24,2):
             d= df.loc[(df['Row'] == 10) & (df['Column'] == i),'Compound' ].values[0]
             fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,font=dict(size=15),textangle=-25)
+        ''' 
         for i in range(len(df)):
             if df.at[i,'Red Flag'] == 'Yes':
                 fig.add_shape(type="rect",x0=df.at[i,'Column']-0.5,y0=df.at[i,'Row']-0.5,x1=df.at[i,'Column']+0.5,y1=df.at[i,'Row']+0.5,line=dict(color="Red",width=4,dash='dot'),) 
+        '''
         return fig
     context = {}
-    return render(request, 'catalog/qc2.html',context)               
-        
-
+    return render(request, 'catalog/qc3.html',context)                           
+@login_required(login_url='/accounts/login/')
+def liver (request):        
+    adata = sc.read_h5ad('static/adata_liver.h5ad') 
+    df = pd.DataFrame(adata.X.A,index=adata.obs_names,columns = adata.var.features)
+    df['Treatment'] = adata.obs.treatment
+    df['Sample'] = adata.obs['orig.ident']
+    df['Cell Type'] = adata.obs.celltypist3
+    df[['UMAP1', 'UMAP2']] = pd.DataFrame(adata.obsm['X_umap'],index=adata.obs_names)
+    dropdown = list(adata.var.features)
+    dropdown2 = ['ALL'] + list(df['Cell Type'].unique())
+    app = DjangoDash('app_liver',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
+    col = [{"label": i , "value": i } for i in dropdown]
+    '''
+    table_control = html.Div([ 
+            html.Div (children=[html.Button('Plot', id='editing-columns-button', n_clicks=0)],style={'width': '92%', 'display': 'inline-block'}),
+            ])
+    '''
+    app.layout = html.Div([
+        html.Div([dcc.Dropdown(dropdown2,['ALL'],multi=True,placeholder='Select Cell Type',id='cell-type',style={'width':'50%'})]),
+        html.Div([dcc.Dropdown(multi=False,placeholder='Enter Gene Name',id='editing-columns-name',style={'width':'50%'})]),
+        html.Div([dcc.Dropdown(multi=False,options=[1,2,3,4,5,6,7,8,9,10],value=5,id='point-size',style={'width':'50%'})]),
+        html.Div([dcc.Checklist(id='nonZero',options=['Remove Zero'],value='',style={'width': '10%',})]),
+        #dbc.Row([dbc.Col(table_control)]),
+        html.Div([
+        dcc.Graph(id="indicator-graphic1",config={"displaylogo": False,'toImageButtonOptions':{
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+        dcc.Graph(id="indicator-graphic2",config={"displaylogo": False,'toImageButtonOptions': {
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+                  ],style={'display': 'flex'}),
+        html.Div([
+        dcc.Graph(id="indicator-graphic3",config={"displaylogo": False,'toImageButtonOptions':{
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+        dcc.Graph(id="indicator-graphic4",config={"displaylogo": False,'toImageButtonOptions': {
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+                  ],style={'display': 'flex'}),
+        dcc.Graph(id="indicator-graphic5",config={"displaylogo": False,'toImageButtonOptions': {
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+    ])
+    @app.callback(
+    Output("editing-columns-name", "options"),
+    Input("editing-columns-name", "search_value")
+    )
+    def update_options(search_value):
+        if not search_value:
+            raise PreventUpdate
+        elif len(search_value)<3:
+            raise PreventUpdate 
+        return [o for o in col if search_value in o["label"]]
+    @app.callback(
+    Output('indicator-graphic1', "figure"),
+    Input('cell-type', "value"),
+    #Input('editing-columns-button', "n_clicks"),
+    Input('point-size', "value"),
+    Input('editing-columns-name', 'value'),
+    Input('nonZero', 'value'),
+    )
+    def update_graphs1(celltype,psize,value,zero):
+        fig = []
+        if 'ALL' in celltype:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0], x="UMAP1", y="UMAP2",color = value,
+                             color_continuous_scale = 'balance')
+            else:
+                fig = px.scatter(df, x="UMAP1", y="UMAP2",color = value,
+                             color_continuous_scale = 'balance')
+        else:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0][df[df[value] != 0]['Cell Type'].isin(celltype)], 
+                             x="UMAP1", y="UMAP2",color = value,
+                             color_continuous_scale = 'balance')
+            else:
+                fig = px.scatter(df[df['Cell Type'].isin(celltype)], x="UMAP1", y="UMAP2",
+                              color = value,color_continuous_scale = 'balance')
+        fig.update_traces(marker=dict(size=psize))
+        fig.update_traces(hoverinfo='none',hovertemplate=None)
+        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        fig.update_layout(height = 600,width=600 )    
+        return fig    
+    @app.callback(
+    Output('indicator-graphic2', "figure"),
+    Input('cell-type', "value"),
+    #Input('editing-columns-button', "n_clicks"),
+    Input('point-size', "value"),
+    Input('editing-columns-name', 'value'),
+    Input('nonZero', 'value'),
+    )
+    def update_graphs2(celltype,psize,value,zero):
+        fig = []
+        if 'ALL' in celltype:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0], x="UMAP1", y="UMAP2",color = 'Cell Type')
+            else:
+                fig = px.scatter(df, x="UMAP1", y="UMAP2",color = 'Cell Type')
+        else:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0][df[df[value] != 0]['Cell Type'].isin(celltype)], 
+                                 x="UMAP1", y="UMAP2",color = 'Cell Type')
+            else:
+                fig = px.scatter(df[df['Cell Type'].isin(celltype)], x="UMAP1", y="UMAP2",color = 'Cell Type')
+        fig.update_traces(marker=dict(size=psize))
+        fig.update_traces(hoverinfo='none',hovertemplate=None)
+        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        fig.update_layout(height = 600,width=700 )
+        return fig
+    @app.callback(
+    Output('indicator-graphic3', "figure"),
+    Input('cell-type', "value"),
+    #Input('editing-columns-button', "n_clicks"),
+    Input('point-size', "value"),
+    Input('editing-columns-name', 'value'),
+    Input('nonZero', 'value'),
+    )
+    def update_graphs3(celltype,psize,value,zero):
+        fig = []
+        if 'ALL' in celltype:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0], x="UMAP1", y="UMAP2",color = 'Treatment')
+            else:
+                fig = px.scatter(df, x="UMAP1", y="UMAP2",color = 'Treatment')
+        else:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0][df[df[value] != 0]['Cell Type'].isin(celltype)],
+                                 x="UMAP1", y="UMAP2",color = 'Treatment')
+            else:
+                fig = px.scatter(df[df['Cell Type'].isin(celltype)], x="UMAP1", y="UMAP2",color = 'Treatment')
+        fig.update_traces(marker=dict(size=psize))
+        fig.update_traces(hoverinfo='none',hovertemplate=None)
+        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        fig.update_layout(height = 600,width=699)
+        return fig
+    @app.callback(
+    Output('indicator-graphic4', "figure"),
+    Input('cell-type', "value"),
+    #Input('editing-columns-button', "n_clicks"),
+    Input('point-size', "value"),
+    Input('editing-columns-name', 'value'),
+    Input('nonZero', 'value'),
+    )
+    def update_graphs4(celltype,psize,value,zero):
+        fig = []
+        if 'ALL' in celltype:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0], x="UMAP1", y="UMAP2",color = 'Sample')
+            else:
+                fig = px.scatter(df, x="UMAP1", y="UMAP2",color = 'Sample')
+        else:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0][df[df[value] != 0]['Cell Type'].isin(celltype)],
+                                 x="UMAP1", y="UMAP2",color = 'Sample')
+            else:
+                fig = px.scatter(df[df['Cell Type'].isin(celltype)], x="UMAP1", y="UMAP2",color = 'Sample')
+        fig.update_traces(marker=dict(size=psize))
+        fig.update_traces(hoverinfo='none',hovertemplate=None)
+        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        fig.update_layout(height = 600,width=699)
+        return fig
+    @app.callback(
+    Output('indicator-graphic5', "figure"),
+    Input('cell-type', "value"),
+    #Input('editing-columns-button', "n_clicks"),
+    Input('editing-columns-name', 'value'),
+    Input('nonZero', 'value'),
+    )
+    def update_graphs5(celltype,value,zero):
+        fig = []
+        if 'ALL' in celltype:
+            fig = []
+        else:
+            if 'Remove Zero' in zero:
+                fig = px.violin(df[df[value] != 0][df[df[value] != 0]['Cell Type'].isin(celltype)], x= 'Cell Type',y=value,
+                                color = 'Treatment',points="all")
+            else:
+                fig = px.violin(df[df['Cell Type'].isin(celltype)], x= 'Cell Type',y=value,
+                                color = 'Treatment',points="all")
+            fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+            fig.update_layout(height = 540,width=1620 )
+        return fig
+    context = {}
+    return render(request, 'catalog/liver.html',context) 
 from django.views import generic
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django_tables2 import SingleTableView
