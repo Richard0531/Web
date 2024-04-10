@@ -54,7 +54,7 @@ import scanpy as sc
 from scipy.sparse import csr_matrix, save_npz
 from scipy.sparse import load_npz
 import matplotlib.pyplot as plt
-
+import math
 @login_required(login_url='/accounts/login/')
 def index(request):
     
@@ -1201,12 +1201,14 @@ def image(request):
                     else:
                         df_plate.at[i,'Well Result'] = 'Drug Interaction'
                         df_plate.at[i,'Color'] = '2'
+        '''
         def change_value(row):
             if 'Control' in row['Compound'] and row['Well Result'] == 'Drug Interaction':
                 row['Well Result'] = 'Peeling'
                 row['Color'] = 3
             return row
         df_plate = df_plate.apply(change_value, axis=1)  
+        '''
         for i in range(len(df_plate)):
             if df_plate.at[i,'Well Result'] == 'Drug Interaction':
                 df_plate.at[i,'Status'] = 'Pass'
@@ -1474,15 +1476,21 @@ def qc2(request):
     app = DjangoDash('app_qc2',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
     file_upload = html.Div([
             html.Div([
-            #html.Div(children=[
-                #dcc.Upload(id='upload-data1',children=html.Div([html.A('Select Objects_Population - Cells')]),)],
-                #style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
-            #html.Div(children=[
-                #dcc.Upload(id='upload-data2',children=html.Div([html.A('Select Objects_Population - CyQuant')]),)],
-                #style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            html.Div(children=[
+                dcc.Upload(id='upload-data1',children=html.Div([html.A('Select Drug Interaction FOV file')]),)],
+                style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            html.Div(children=[
+                dcc.Upload(id='upload-data2',children=html.Div([html.A('Select Whole Image population file')]),)],
+                style={'width': '16.6%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
             html.Div(children=[
                 dcc.Upload(id='upload-data3',children=html.Div([html.A('Select PlateResult file')]),)],
-                style={'width': '80%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+                style={'width': '16.8%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            html.Div(children=[
+                dcc.Upload(id='upload-data4',children=html.Div([html.A('Select AOPI 1 file')]),)],
+                style={'width': '15%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
+            html.Div(children=[
+                dcc.Upload(id='upload-data5',children=html.Div([html.A('Select AOPI 2 file')]),)],
+                style={'width': '15%', 'display': 'inline-block','borderWidth': '1px','borderStyle': 'solid','borderRadius': '5px','textAlign': 'center',},),
                 ]),
                 ], style={'display': 'block'}, id='check-container')
     plot_upload = html.Div([
@@ -1500,6 +1508,9 @@ def qc2(request):
                 html.Div(id='output-data-upload'),]),
                 ])
                 ], style={'display': 'block'}, id='check-container2')
+    aopi = html.Div([
+            html.Div([
+             html.Div(children=[html.Div(id='aopi-data-block'),]),]) ], style={'display': 'block'}, id='check-container-aopi')
     app.layout = html.Div([
         dbc.Row([dbc.Col(file_upload)]),
         dcc.Upload(
@@ -1519,83 +1530,292 @@ def qc2(request):
             },
             multiple=True
         ),
+        dcc.Download( id="download-pdf"),
+        dbc.Button('PLATE REPORT', id='export-button',size="lg",color="primary",n_clicks=0),
         dbc.Row([dbc.Col(plot_upload)]),
+        dbc.Row([dbc.Col(aopi)]),
         ])
-    def parse_contents_plate(contents):
+
+    @app.callback(
+        Output("download-pdf", 'data'),
+        Input("export-button", 'n_clicks'),
+        State('datatable-interactivity-3', "derived_virtual_data"),
+        State('datatable-interactivity-aopi1', "derived_virtual_data"),
+        State('datatable-interactivity-aopi2', "derived_virtual_data"),
+        prevent_initial_call=True
+        )
+    def export_to_pdf(n_clicks,data,aopi1,aopi2):
+        df = pd.DataFrame(data)
+        aopi1 = pd.DataFrame(aopi1)
+        aopi2 = pd.DataFrame(aopi2)
+        aopi = aopi1['Viability %'] + aopi2['Viability %']
+        aopi = round(aopi.mean() / 2,2)
+        filtered_df_drug = df[df['Compound'].str.contains('Control', case=False, regex=False)]
+        control = filtered_df_drug['Fail'].astype(int).sum()
+        if control <5 and aopi > 25:
+            res = 'Passed'
+        elif control >5 and aopi > 25:
+            res = 'Failed_control'
+        elif control <5 and aopi < 25:
+            res = 'Failed_aopi'
+        else:
+            res = 'Failed'
+        table2_data = df.iloc[:12]
+        table3_data = df.iloc[12:]
+        geometry_options = {'tmargin':'0.5cm','lmargin':'0.5cm','rmargin':'0.5cm','paperwidth':'612pt','paperheight':'792pt'}
+        doc = Document(geometry_options=geometry_options)
+        doc.append(NoEscape(r'\centering'))
+        #
+        table1 = Tabular('||p{7cm} p{2cm}||p{7cm} p{2cm}||',booktabs=True)
+        #table1 = Tabular('|X X|X X|')
+        table1.add_hline()
+        #long_string = 'St. Jude Children’s Research Hospital Clinical Pharmacotyping Laboratory Memphis, TN  38105'
+        #table1.add_row((NoEscape(r'\parbox[t]{6.55cm}{' + long_string + '}'),'Form Number:  CPT.X.X'))
+        table1.add_row(('St. Jude Children’s Research Hospital','','','Page 1 of 1'))
+        table1.add_row(('Clinical Pharmacotyping Laboratory','','Form Number:  CPT.X.X',''))
+        table1.add_row(('Memphis, TN  38105','','',''))
+        table1.add_hline()
+        table1.add_hline()
+        table1.add_row((MultiColumn(4,align='||c||', data = ''),))
+        table1.add_row((MultiColumn(4,align='||c||', data = LargeText(bold('Quality Control – Plate Processing Analysis'))),))
+        table1.add_row((MultiColumn(4,align='||c||', data = ''),))
+        table1.add_hline()
+        table_user = Tabular(' p{0.33\linewidth} p{0.33\linewidth} p{0.33\linewidth}|')
+        table_user.add_row(('MRN/Plate#: ','Accession: ','Label here '))
+        table_user.add_row(('','',''))
+        table_user.add_row(('Name: ','QC Date: ',''))
+        table_user.add_row(('','',''))
+        #with doc.create(Section('',numbering=False)):
+        doc.append(table1)
+        doc.append(LineBreak())
+        #doc.append('No space here.' + r'\!')
+        #with doc.create(MiniPage(align='c')):
+            #doc.append(table1)
+        #with doc.create(Section('',numbering=False)):
+        doc.append(table_user)
+        doc.append(LineBreak())
+        table2 = Tabular('|c|c|c|c|')
+        table2.add_hline()
+        table2.add_row(table2_data.columns)
+        table2.add_hline()
+        for _, row in table2_data.iterrows():
+            table2.add_row(row)
+        table2.add_hline()
+        table3 = Tabular('|c|c|c|c|')
+        table3.add_hline()
+        table3.add_row(table3_data.columns)
+        table3.add_hline()
+        for _, row in table3_data.iterrows():
+            table3.add_row(row)
+        if table3_data.shape[0] == 11:
+            table3.add_row(('','','',''))
+        table3.add_hline()
+        table_comment = Tabular('|c c c c c c c c c c c c|')
+        table_comment.add_hline()
+        table_comment.add_row(('Comments:','','','','','','','','','','',''))
+        table_comment.add_hline()
+        for i in range(0,12):
+            table_comment.add_row('','','','','','','','','','','','')
+        table_comment.add_hline()
+        #with doc.create(Section('',numbering=False)):
+        with doc.create(Tabular('c c c',booktabs=False)) as tables:
+            tables.add_row(table2, table3, table_comment)
+        with doc.create(Section('',numbering=False)):
+            with doc.create(Figure(position='h!')) as plot:
+                with doc.create(SubFigure(
+                        position='b',
+                        width=NoEscape(r'0.49\linewidth'))) as left_plot:
+
+                    left_plot.add_image('/opt/pub/temp/mysite/report_1.png',width=NoEscape(r'\linewidth'))
+                    left_plot.add_caption('Plate Status')
+                with doc.create(SubFigure(
+                        position='b',
+                        width=NoEscape(r'0.53\linewidth'))) as right_plot:
+                    right_plot.add_image('/opt/pub/temp/mysite/report_2.png',width=NoEscape(r'\linewidth'))
+                    right_plot.add_caption('Plate Image')
+        with doc.create(Figure(position='h!')) as index_picture:
+            with doc.create(SubFigure(position='h!')) as left:
+                left.add_image('/opt/pub/temp/mysite/Index2.PNG', width='240px')
+        with doc.create(Figure(position='h!')) as qc_picture:
+            if res == 'Passed':
+                qc_picture.add_image('/opt/pub/temp/mysite/Passed.png',width='160px')
+            elif res == 'Failed_control':
+                qc_picture.add_image('/opt/pub/temp/mysite/Failed-controlwells.png',width='220px')
+            elif res == 'Failed_aopi':
+                qc_picture.add_image('/opt/pub/temp/mysite/Failed-aopi.png',width='220px')
+            else:
+                qc_picture.add_image('/opt/pub/temp/mysite/Failed.png',width='220px')
+        pdf_filename = 'output'
+        doc.generate_pdf(pdf_filename, clean_tex=True)
+        if n_clicks > 0:
+            return dcc.send_file('/opt/pub/temp/mysite/output.pdf')
+        else:
+            return n_clicks
+    def parse_contents_plate(contents,columns):
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=8,usecols = columns)
+    def parse_contents_columns(contents,columns):
+        content_type, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9,usecols = columns)
+    def parse_contents_AOPI(contents):
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
         return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=8)
-    def parse_contents_columns(contents):
-        content_type, content_string = contents.split(',')
-        decoded = base64.b64decode(content_string)
-        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9)
     @app.callback(Output('output-data-upload', 'children'),
-              [
-               
+              [Input('upload-data1', 'contents'),
+               Input('upload-data2', 'contents'),
                Input('upload-data3', 'contents'),
+
                ]
               )
-    def update_output(contents3):
-        #df2 = parse_contents_columns(contents2)
-        #df1 = parse_contents_columns(contents1)
-        df3 = parse_contents_plate(contents3)
+    def update_output(contents1,contents2,contents3):
+        if contents1 is None or contents2 is None or contents3 is None:
+            return 'Upload all files'
+        columns_df1 = [0,1,4,11,12,13,14,16,17,18,19,20,21,22,23]
+        columns_df2 = [0,1,4,18,19]
+        columns_df3 = [0,1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,23,24,25,26]
+        #columns_df4 = [0,1,4,15,16]
+        df1 = parse_contents_columns(contents2,columns_df1)
+        df2 = parse_contents_columns(contents1,columns_df2)
+        df3 = parse_contents_plate(contents3,columns_df3)
+        #df4 = parse_contents_columns(contents4,columns_df4)
         columns_to_convert = ['Row', 'Column','Field']
         columns_to_convert_plate = ['Row', 'Column']
-        #df1[columns_to_convert] = df1[columns_to_convert].astype(str)
-        #df2[columns_to_convert] = df2[columns_to_convert].astype(str)
+        df1[columns_to_convert] = df1[columns_to_convert].astype(str)
+        df2[columns_to_convert] = df2[columns_to_convert].astype(str)
+        #df4[columns_to_convert] = df4[columns_to_convert].astype(str)
         df3[columns_to_convert_plate] = df3[columns_to_convert_plate].astype(str)
-        #df1['ID'] = df1['Row'] + df1['Column'] + df1['Field']
-        #df1['Well ID'] = df1['Row'] + df1['Column']
-        #df2['ID'] = df2['Row'] + df2['Column']
+        df1['ID'] = df1['Row'] + df1['Column'] + df1['Field']
+        df1['Well ID'] = df1['Row'] + df1['Column']
+        df2['ID'] = df2['Row'] + df2['Column'] + df2['Field']
         df3['Well ID'] = df3['Row'] + df3['Column']
-        #df3['Peeling Ratio'] = df3['Emptyness - Empty CyQuant AREA Area [µm²] - Sum per Well'] / df3['CELL AREA'] 
-        df3['Var1'] = abs(df3['Emptyness - Empty CyQuant Region Centroid X in Well [µm] - Mean per Well'])+abs(df3['Emptyness - Empty CyQuant Region Centroid Y in Well [µm] - Mean per Well'])
-        df3['Var2'] = df3['Peeled Layer - Peeled Region Area [µm²] - Max per Well'] / df3['Cell Layer - Cell Region Area [µm²] - Max per Well']
-        df3['Status'] = ''
-        df3['Color'] = ''
-        df3 = round(df3,5)
-        #df3['Red Flag'] = ''
-        #df3['Regression'] = ''
-        for i in range(len(df3)):
-            if df3.at[i,'Whole Image (global) - Emptyness (global) overlap Overlap [%] - Mean per Well'] > 35 and (df3.at[i,'Var1'] > 180 and df3.at[i,'Var1'] < 250 ) and df3.at[i,'Var2'] > 1 :
-                df3.at[i,'Status'] = 'Fail'
-                df3.at[i,'Color'] = '4'
-            elif df3.at[i,'Whole Image (global) - Emptyness (global) overlap Overlap [%] - Mean per Well'] < 35 and (df3.at[i,'Var1'] > 250 and df3.at[i,'Var1'] < 500 ) and df3.at[i,'Var2'] < 1:
-                df3.at[i,'Status'] = 'Pass'
-                df3.at[i,'Color'] = '1'
+        #df4['ID'] = df4['Row'] + df4['Column'] + df4['Field']
+        #columns_to_delete_1 =[2,3,5,6,7,8,9,10,14,22]
+        columns_to_delete_2 = [0,1,2]
+        #columns_to_delete_4 = [0,1,2]
+        #columns_to_delete_3 = [2,3,20,21,22,26,27]
+        #df1 = df1.drop(df1.columns[columns_to_delete_1], axis=1)
+        df2 = df2.drop(df2.columns[columns_to_delete_2], axis=1)
+        #df3 = df3.drop(df3.columns[columns_to_delete_3], axis=1)
+        #df4 = df4.drop(df4.columns[columns_to_delete_4], axis=1)
+        #df = pd.merge(df1, df4, how='left', on='ID')
+        df = pd.merge(df1, df2, how='left', on='ID')
+        df['Status'] = ''
+        for i in range(len(df)):
+            if np.isnan(df.at[i,'Whole Image Population - Empty Ratio-2']):
+                df.at[i,'Status'] = 'Normal'
+            elif df.at[i,'Whole Image Population - Peeling Factor-2'] < 0.0001:
+                df.at[i,'Status'] = 'Drug Interaction'
             else:
-                df3.at[i,'Status'] = 'Pass'
-                df3.at[i,'Color'] = '1'
-                
-        '''
-        for i in range(len(df3)):
-            if df3.at[i,'Normal - Number of Objects'] == 1:
-                df3.at[i,'Status'] = 'Normal'
-                df3.at[i,'Color'] = '1'
-            elif df3.at[i,'Peeling - Number of Objects'] == 1:
-                df3.at[i,'Status'] = 'Peeling'
-                df3.at[i,'Color'] = '3'
-            elif df3.at[i,'Drug Interaction - Number of Objects'] == 1:
-                df3.at[i,'Status'] = 'Drug Interaction'
-                df3.at[i,'Color'] = '2'
+                df.at[i,'Status'] = 'Peeling'
+        summary_table = df.pivot_table(index='Well ID', columns='Status', aggfunc='size', fill_value=0)
+        if 'Peeling' in summary_table:
+            summary_table = summary_table
+        else:
+            summary_table['Peeling'] = 0
+        summary_table['Normal'] = 9-summary_table['Drug Interaction'] - summary_table['Peeling']
+        summary_table = summary_table.reset_index()
+        df_plate = pd.merge(df3, summary_table, how='left', on='Well ID')
+        df_plate['Well Result'] = ''
+        df_plate['Status'] = ''
+        df_plate['Color'] = ''
+        df_plate['Red Flag'] = ''
+        for i in range(len(df_plate)):
+            if df_plate.at[i,'Peeling'] > 3:
+                df_plate.at[i,'Status'] = 'Fail'
             else:
-                df3.at[i,'Status'] = 'Normal'
-                df3.at[i,'Color'] = '1'
-        
-        for i in range(len(df3)):
-            if (df3.at[i,'Cells (global) - Regression A-B - Mean per Well'] > -1 and df3.at[i,'Cells (global) - Regression A-B - Mean per Well'] < 1 and df3.at[i,'Status'] == 'Peeling' ):
-                df3.at[i,'Red Flag'] = 'Yes' 
-                df3.at[i,'Regression'] = df3.at[i,'Status']  + '\n' + 'Regression: '+df3.at[i,'Cells (global) - Regression A-B - Mean per Well'].astype(str) + '\n' + 'Peeling Ratio: '+ df3.at[i,'Peeling Ratio'].astype(str)
+                df_plate.at[i,'Status'] = 'Pass'
+        for i in range(len(df_plate)):
+            if df_plate.at[i,'Normal'] == 9:
+                df_plate.at[i,'Well Result'] = 'Normal'
+                df_plate.at[i,'Color'] = '1'
+            elif df_plate.at[i,'Peeling Factor']<0.0001:
+                if df_plate.at[i,'Whole Image Population - Peeling Factor-2 - Mean per Well'] > 0.0001 and df_plate.at[i,'Empty Ratio'] < 1:
+                    df_plate.at[i,'Well Result'] = 'Peeling'
+                    df_plate.at[i,'Color'] = '3'
+                else:
+                    df_plate.at[i,'Well Result'] = 'Drug Interaction'
+                    df_plate.at[i,'Color'] = '2'
             else:
-                df3.at[i,'Red Flag'] = 'No' 
-                df3.at[i,'Regression'] = df3.at[i,'Status']  + '\n' + 'Regression: '+df3.at[i,'Cells (global) - Regression A-B - Mean per Well'].astype(str) + '\n' + 'Peeling Ratio: '+ df3.at[i,'Peeling Ratio'].astype(str)
-        '''
+                if df_plate.at[i,'Empty Area Population - Drug Interaction FOV - CV % per Well'] < 9500:
+                    if df_plate.at[i,'Spots - Number of Objects'] < 10000 and  df_plate.at[i,'Hole Factor']<1:
+                        if df_plate.at[i,'Normal FOV - Number of Objects'] >20000:
+                            df_plate.at[i,'Well Result'] = 'Drug Interaction'
+                            df_plate.at[i,'Color'] = '2'
+                        else:
+                            df_plate.at[i,'Well Result'] = 'Peeling'
+                            df_plate.at[i,'Color'] = '3'
+                    else:
+                        df_plate.at[i,'Well Result'] = 'Peeling'
+                        df_plate.at[i,'Color'] = '3'
+                else:
+                    if df_plate.at[i,'Whole Image Population - Peeling Factor-2 - Mean per Well'] > 0.0001 and df_plate.at[i,'Empty Ratio'] < 1:
+                        df_plate.at[i,'Well Result'] = 'Peeling'
+                        df_plate.at[i,'Color'] = '3'
+                    else:
+                        df_plate.at[i,'Well Result'] = 'Drug Interaction'
+                        df_plate.at[i,'Color'] = '2'
+        def change_value(row):
+            if 'Control' in row['Compound'] and row['Well Result'] == 'Drug Interaction':
+                row['Well Result'] = 'Peeling'
+                row['Color'] = 3
+            return row
+        df_plate = df_plate.apply(change_value, axis=1)
+        for i in range(len(df_plate)):
+            if df_plate.at[i,'Well Result'] == 'Drug Interaction':
+                df_plate.at[i,'Status'] = 'Pass'
+            if df_plate.at[i,'Well Result'] == 'Drug Interaction':
+                if df_plate.at[i,'Peeling'] >3:
+                    df_plate.at[i,'Red Flag'] = 'Yes'
+                else:
+                    df_plate.at[i,'Red Flag'] = "No"
+            else:
+                df_plate.at[i,'Red Flag'] = 'No'
+
+        df_plate['FOV']= 'Normal: '+ df_plate['Normal'].astype(str) + '\n' + 'DI: ' + df_plate['Drug Interaction'].astype(str) + '\n' + 'Peeling: ' + df_plate['Peeling'].astype(str)
+        df_plate['FOV']=df_plate['FOV'] + '<br>' + 'Well Result: ' + df_plate['Well Result'].astype(str)
+        df_plate[columns_to_convert_plate] = df_plate[columns_to_convert_plate].astype(int)
+        drug_order =  list(df_plate.loc[df_plate['Row'].isin([2,7,10]),]['Compound'].unique())
+        df_plate['Compound'] = pd.Categorical(df_plate['Compound'], categories=drug_order, ordered=True)
+        df_drug = df_plate.pivot_table(index='Compound', columns='Status', aggfunc='size', fill_value=0).reset_index()
+        if 'Fail' not in df_drug:
+            df_drug['Fail'] = 0
+        df_drug['Status'] = df_drug.apply(lambda row: 'Failed' if row['Fail'] > 4 else 'Passed', axis=1)
         return html.Div([
             dash_table.DataTable(
-                    df3.to_dict('records'),
-                    [{'name': i, 'id': i,"hideable":True} for i in df3.columns],
-                    id='datatable-interactivity-3',
+                    df.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in df.columns],
+                    id='datatable-interactivity-1',
                     fixed_columns={ 'data': 2},
+                    page_size= 25,
+                    filter_action="native",
+                    filter_options = {'case':'insensitive'},
+                    sort_action="native",
+                    sort_mode="multi",
+                    page_action="native",
+                    style_header_conditional=[
+                         {'if': {'column_id': 'Whole Image Population - Peeling Factor-2'},'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Whole Image Population - Empty Ratio-2'},'backgroundColor': 'lightblue'},
+                    ],
+                    style_data_conditional=[
+                         {'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'},
+                         {'if': {'filter_query': '{Whole Image Population - Peeling Factor-2} > 0.0001','column_id': 'Whole Image Population - Peeling Factor-2'},'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Whole Image Population - Empty Ratio-2} > 1','column_id': 'Whole Image Population - Empty Ratio-2'},'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Status} = Peeling','column_id': 'Status'},'backgroundColor': 'red','color':'white'},
+                    ],
+                    #hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
+                    export_format='xlsx',export_headers='display',
+                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                ),
+            dash_table.DataTable(
+                    df_plate.to_dict('records'),
+                    columns = [{'name': i, 'id': i,"hideable":True} for i in df_plate.columns],
+                    id='datatable-interactivity-2',
                     page_size= 25,
                     editable=True,
                     filter_action="native",
@@ -1603,12 +1823,54 @@ def qc2(request):
                     sort_action="native",
                     sort_mode="multi",
                     page_action="native",
-                    #hidden_columns=['Regression'],
+                    hidden_columns=['Color','FOV'],
+                    #hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
                     export_format='xlsx',export_headers='display',
-                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
+                    style_table={'overflowX': 'auto'},
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_header_conditional=[
+                         {'if': {'column_id': 'Peeling Factor'},'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Whole Image Population - Peeling Factor-2 - Mean per Well' },'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Empty Ratio'  },'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Empty Area Population - Drug Interaction FOV - CV % per Well'},'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Spots - Number of Objects'},'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Hole Factor'},'backgroundColor': 'lightblue'},
+                         {'if': {'column_id': 'Normal FOV - Number of Objects'},'backgroundColor': 'lightblue'},
+                    ],
+                    style_data_conditional=[
+                         {'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'},
+                         {'if': {'filter_query': '{Peeling Factor} > 0.0001','column_id': 'Peeling Factor'},'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Well Result} = Peeling','column_id': 'Well Result'},'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Whole Image Population - Peeling Factor-2 - Mean per Well}>0.0001','column_id': 'Whole Image Population - Peeling Factor-2 - Mean per Well' },'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Normal FOV - Number of Objects }<20000','column_id':'Normal FOV - Number of Objects'}, 'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Spots - Number of Objects}>1000','column_id':'Spots - Number of Objects'}, 'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Hole Factor }>1','column_id':'Hole Factor' }, 'backgroundColor': 'red','color':'white'},
+                         {'if': {'filter_query': '{Empty Area Population - Drug Interaction FOV - CV % per Well}>9500','column_id':'Empty Area Population - Drug Interaction FOV - CV % per Well'}, 'backgroundColor': 'red','color':'white'},
+                    ],
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                ),
+            dash_table.DataTable(
+                    df_drug.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in df_drug.columns],
+                    id='datatable-interactivity-3',
+                    editable=True,
+                    page_size= 25,
+                    filter_action="native",
+                    filter_options = {'case':'insensitive'},
+                    sort_action="native",
+                    sort_mode="multi",
+                    page_action="native",
+                    hidden_columns=['Color','FOV'],
+                    #hidden_columns=['Display',"Use for Z'",'Plane','Timepoint','Normal FOV - Number of Objects','Height [µm]','Time [s]','Cell Type','color'],
+                    export_format='xlsx',export_headers='display',
+                    style_table={'overflowX': 'auto'},
                     style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
         'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
                     style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                    style_data_conditional=[
+                        {'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220,220,220)'},
+                    ],
                 ),
                 ])
     def image_contents(contents):
@@ -1617,6 +1879,11 @@ def qc2(request):
         nparr = np.frombuffer(decoded_image, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         return image
+        #return   html.Div([
+         #   html.H5(filename),
+          #  html.Img(src=contents),
+           # html.Hr(),
+        #])
     @app.callback(Output('output-image-upload', 'figure'),
               Input('upload-image', 'contents'),
               State('upload-image', 'filename'),
@@ -1632,14 +1899,18 @@ def qc2(request):
                 fig = px.imshow(image,height = 738,width=1291.5,title = t)
                 fig.update_xaxes(showticklabels=False)
                 fig.update_yaxes(showticklabels=False)
+
                 for i in range(1,22):
                     fig.add_annotation(x=(((image.shape[1] /21) * i ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text=str(i+2),showarrow=False,font=dict( size=20,))
-                cordinator = ['1','2','3','4','5','6','7','10','11','12','13','14','15']
+
+                cordinator = ['A','B','C','D','E','F','G','J','K','L','M','N','O']
                 for i in range(1,13):
-                    fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * i ) - (image.shape[0] /24)),text=cordinator[i],showarrow=False,font=dict( size=20,)) 
+                    fig.add_annotation(x=(0 - (image.shape[1] /42)), y=(((image.shape[0] /12) * i ) - (image.shape[0] /24)),text=cordinator[i],showarrow=False,font=dict( size=20,))
                 fig.add_shape(type="rect",x0=0,y0=0,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0],line=dict(color="Grey",width=3,))
+                '''
                 for i in range(1,21,2):
                     fig.add_shape(type="rect",x0=((image.shape[1] /21) * i),y0=0,x1=((image.shape[1] /21) * (i+2)) ,y1=image.shape[0] ,line=dict(color="Grey",width=3,))
+                '''
                 fig.add_shape(type="rect",x0=0,y0=0,x1=((image.shape[1] /21) * 21) ,y1=image.shape[0] /2,line=dict(color="Grey",width=3,))
                 fig.update_traces(hoverinfo='none',hovertemplate=None)
                 fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
@@ -1650,40 +1921,105 @@ def qc2(request):
                 pio.write_image(fig, file_path, format='png')
                 return fig
         return {'data': [], 'layout': go.Layout()}
+
+    @app.callback(Output('aopi-data-block', 'children'),
+              [Input('upload-data4', 'contents'),
+               Input('upload-data5', 'contents'),
+               ],
+               prevent_initial_call=True)
+    def aopi(aopi1,aopi2):
+        aopi1 = parse_contents_AOPI(aopi1)
+        aopi2 = parse_contents_AOPI(aopi2)
+        return html.Div([
+            dash_table.DataTable(
+                    aopi1.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in aopi1.columns],
+                    id='datatable-interactivity-aopi1',
+                    export_format='xlsx',export_headers='display',
+                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                    ),
+            dash_table.DataTable(
+                    aopi2.to_dict('records'),
+                    [{'name': i, 'id': i,"hideable":True} for i in aopi2.columns],
+                    id='datatable-interactivity-aopi2',
+                    export_format='xlsx',export_headers='display',
+                    style_table={'overflowX': 'auto','overflowY': 'auto','width':'auto' },
+                    style_cell={'height': 'auto','minWidth': '50px', 'width': '180px', 'maxWidth': '180px',
+        'whiteSpace': 'normal','overflow': 'hidden','font-family':'Helvetica'},
+                    style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'},
+                    ),
+           ])
     @app.callback(
     Output("indicator-graphic", "figure"),
-    [Input('datatable-interactivity-3', "derived_virtual_data"),]
-    )    
-    def update_graphs(data1):
+    [Input('datatable-interactivity-1', "derived_virtual_data"),
+    Input('datatable-interactivity-2', "derived_virtual_data"),
+    Input('datatable-interactivity-3', "derived_virtual_data"),
+    Input('datatable-interactivity-aopi1', "derived_virtual_data"),
+    Input('datatable-interactivity-aopi2', "derived_virtual_data")
+    ])
+    def update_graphs(data1,data2,data3,aopi1,aopi2):
         df = pd.DataFrame(data1)
-        columns_to_convert = ['Row', 'Column']
-        df[columns_to_convert] = df[columns_to_convert].astype(int)
-        discrete= {4: 'rgb(139,0,0)'}
-        fig = px.imshow(df.pivot('Row', 'Column', 'Color'),zmax = 4,zmin =1 ,color_continuous_scale="Blues")
+        df_plate = pd.DataFrame(data2)
+        df_drug = pd.DataFrame(data3)
+        aopi1 = pd.DataFrame(aopi1)
+        aopi2 = pd.DataFrame(aopi2)
+        cordinator = ['A','B','C','D','E','F','G','','','J','K','L','M','N','O']
+        filtered_df_drug = df_drug[df_drug['Compound'].str.contains('Control', case=False, regex=False)]
+        control = filtered_df_drug['Fail'].astype(int).sum()
+        aopi = aopi1['Viability %'] + aopi2['Viability %']
+        aopi = round(aopi.mean() / 2,2)
+        t = 'AOPI Viability %:' + str(aopi)+ ' '  + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' if control <5 and aopi > 25  else 'AOPI Viability %:' + str(aopi) + " " +'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
+        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title= t)
+        #fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues")
+        fig.update_layout( title_x=0.5)
+        fig.update_layout( title=dict(font =dict(size= 25)))
+        fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'FOV'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>FOV: %{customdata}<br><extra></extra>'}])
         fig.update_layout(coloraxis_showscale=False)
-        fig.update(data=[{'customdata': df.pivot('Row', 'Column', 'Well ID'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>Well ID: %{customdata}<br><extra></extra>'}])
         fig.update_layout(height=713,width=1065.5,)
         fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
         fig.update_layout(margin=dict(l=0, r=0, t=40, b=0),)
-        fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
-        fig.update_layout(font=dict(size=20),xaxis=dict(tickmode='linear'),yaxis=dict(tickmode='linear',side="left"))
+        fig.update_layout(yaxis_title=None,xaxis_title=None,font=dict(size=20),xaxis=dict(tickmode='linear'),yaxis=dict(tickmode='linear',side="left"))
+        fig.update_yaxes(ticktext=cordinator,tickvals=[2,3,4,5,6,7,8,9,10,11,12,13,14,15])
+        fig.update_yaxes(title_text="<b>secondary</b> yaxis title", secondary_y=True)
+        fig.update_layout(coloraxis_colorbar=dict(title=None, ticktext=cordinator, tickmode='array', ticks='outside'))
+        if '2' in df['Column'].values:
+            fig.add_shape(type="rect",x0=1.5,y0=1.5,x1=23.5,y1=15.5)
+        else:
+            fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
         for i in range(3,23,2):
             fig.add_vline(x=i+0.5,line_width=1)
             fig.add_vline(x=i+1.5,line_width=1, line_dash="dash")
         for i in range(2,15):
-            fig.add_hline(y=i+0.5,line_width=1, line_dash="dash") 
+            fig.add_hline(y=i+0.5,line_width=1, line_dash="dash")
+
         fig.add_shape(type="rect",x0=2.5, y0=5.5, x1=3.5, y1=6.5,fillcolor="Grey",),fig.add_shape(type="rect",x0=2.5, y0=13.5, x1=3.5, y1=14.5,fillcolor="Grey",)
-        fig.add_shape(type="rect",x0=2.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
-        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,font=dict(size=15),textangle=-25),fig.add_annotation(x=3, y=9,text='Control',showarrow=False,font=dict(size=15),textangle=-25)
+        if '2' in df['Column'].astype(str).values:
+            fig.add_vline(x=2.5,line_width=1)
+            fig.add_shape(type="rect",x0=1.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
+        else:
+            fig.add_shape(type="rect",x0=2.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
+        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,font=dict(size=15),textangle=-25),
+        fig.add_annotation(x=3, y=9,text='Control',showarrow=False,font=dict(size=15),textangle=-25)
         for i in range(4,24,2):
-            d= df.loc[(df['Row'] == 2) & (df['Column'] == i),'Compound' ].values[0]
+            d= df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == i),'Compound' ].values[0]
             fig.add_annotation(x=i+0.5, y=8,text=d,showarrow=False,font=dict(size=15),textangle=-25)
+            if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
+                fig.add_shape(type="rect",x0=i-0.5,y0=1.5,x1=i+1.5,y1=7.5, line=dict(color="Red",width = 4),)
+        for i in range(2,16):
+            fig.add_annotation(x=23+1, y=i,text=cordinator[i-1],showarrow=False,font=dict(size=20))
         for i in range(4,24,2):
-            d= df.loc[(df['Row'] == 10) & (df['Column'] == i),'Compound' ].values[0]
+            d= df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == i),'Compound' ].values[0]
             fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,font=dict(size=15),textangle=-25)
-        #for i in range(len(df)):
-        #    if df.at[i,'Red Flag'] == 'Yes':
-        #        fig.add_shape(type="rect",x0=df.at[i,'Column']-0.5,y0=df.at[i,'Row']-0.5,x1=df.at[i,'Column']+0.5,y1=df.at[i,'Row']+0.5,line=dict(color="Red",width=4,dash='dot'),) 
+            if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
+                fig.add_shape(type="rect",x0=i-0.5,y0=9.5,x1=i+1.5,y1=15.5,line=dict(color="Red",width=4))
+        for i in range(len(df_plate)):
+            if df_plate.at[i,'Red Flag'] == 'Yes':
+                fig.add_shape(type="rect",x0=df_plate.at[i,'Column']-0.5,y0=df_plate.at[i,'Row']-0.5,x1=df_plate.at[i,'Column']+0.5,y1=df_plate.at[i,'Row']+0.5,line=dict(color="Red",width=4,dash='dot'),)
+        file_path = os.path.join(os.getcwd(), 'report_1.png')
+        pio.write_image(fig, file_path, format='png')
         return fig
     context = {}
     return render(request, 'catalog/qc2.html',context)   
@@ -1924,7 +2260,7 @@ def liver (request):
     app.layout = html.Div([
         html.Div([dcc.Dropdown(dropdown2,['ALL'],multi=True,placeholder='Select Cell Type',id='cell-type',style={'width':'50%'})]),
         html.Div([dcc.Dropdown(multi=False,placeholder='Enter Gene Name',id='editing-columns-name',style={'width':'50%'})]),
-        html.Div([dcc.Dropdown(multi=False,options=[1,2,3,4,5,6,7,8,9,10],value=5,id='point-size',style={'width':'50%'})]),
+        html.Div([dcc.Dropdown(multi=False,options=[1,2,3,4,5,6,7,8,9,10],value=2,id='point-size',style={'width':'50%'})]),
         html.Div([dcc.Checklist(id='nonZero',options=['Remove Zero'],value='',style={'width': '10%',})]),
         #dbc.Row([dbc.Col(table_control)]),
         html.Div([
@@ -1954,7 +2290,7 @@ def liver (request):
     def update_options(search_value):
         if not search_value:
             raise PreventUpdate
-        elif len(search_value)<3:
+        elif len(search_value)<2:
             raise PreventUpdate 
         return [o for o in col if search_value in o["label"]]
     @app.callback(
@@ -2087,7 +2423,72 @@ def liver (request):
             fig.update_layout(height = 540,width=1620 )
         return fig
     context = {}
-    return render(request, 'catalog/liver.html',context) 
+    return render(request, 'catalog/liver.html',context)
+@login_required(login_url='/accounts/login/')
+def volcano (request):   
+    df = pd.read_csv('static/summary2.csv') 
+    app = DjangoDash('app_volcano',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
+    dropdown1 = list(df['Celltype'].unique())
+    dropdown2 = list(df['Treatment'].unique())
+    dropdown3 = ['ALL']+ list(df['names'].unique())
+    app.layout = html.Div([
+        html.Div([dcc.Dropdown(dropdown1,multi=False,placeholder='Select Cell Type',id='celltype',style={'width':'50%'})]),
+        html.Div([dcc.Dropdown(dropdown2,multi=False,placeholder='Select Treatments',id='treatment',style={'width':'50%'})]),
+        html.Div([dcc.Dropdown(dropdown3,'ALL', multi=True,placeholder='Enter Gene Name',id='editing-columns-name',style={'width':'50%'})]),
+        dcc.Graph(id="indicator-graphic1",config={"displaylogo": False,'toImageButtonOptions':{
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 800,'width': 1200,'scale': 1 }}),
+        ])
+    @app.callback(
+    Output('indicator-graphic1', "figure"),
+    Input('celltype', "value"),
+    Input('treatment', "value"),
+    Input('editing-columns-name', 'value'),
+    )
+    def update_graphs1(celltype,treatment,genes):
+        dff = pd.read_csv('static/summary2.csv')
+        dff = dff[dff['Celltype'] == celltype]
+        dff = dff[dff['Treatment'] == treatment]
+        dff = dff.reset_index()
+        gene_list = list(genes)
+        treatment1 = treatment.split(" vs ")[0]
+        treatment2 = treatment.split(" vs ")[1]
+        fig = dashbio.VolcanoPlot(
+            dataframe=dff,
+            effect_size = 'logFC',
+            p = 'FDR',
+            snp = 'names',
+            gene = 'names',
+            point_size=5,
+            genomewideline_value=2,
+            )
+        fig.update_layout(
+            title=dict(text=treatment,x=0.527 ,font=dict(size=40))
+            )
+        fig.update_layout(
+            xaxis1=dict(title=treatment2+ ' increased' + '               '+'Effect Size'+'               '+treatment1 + ' increased'),
+            font=dict(
+            size=18,
+                      )         
+            )
+        
+        if 'ALL' not in genes:
+            for gene in gene_list:
+                if gene in dff['names'].values:
+                    positionX = float(dff[dff['names'] == gene].iloc[0]['logFC'])
+                    positionY = -math.log10(dff[dff['names'] == gene].iloc[0]['FDR'])
+                    fig.add_annotation(text=gene, x=positionX, y=positionY, arrowhead=1, showarrow=True)
+               
+        else:
+            gene_list = list(dff.head(20)['names'])     
+            for gene in gene_list:
+                positionX = float(dff[dff['names'] == gene].iloc[0]['logFC'])
+                positionY = -math.log10(dff[dff['names'] == gene].iloc[0]['FDR'])
+                fig.add_annotation(text=gene, x=positionX, y=positionY, arrowhead=1, showarrow=True)   
+        fig.update_layout(height=1000, width=1500)
+        return fig
+    context = {}
+    return render(request, 'catalog/volcano.html',context) 
 from django.views import generic
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django_tables2 import SingleTableView
