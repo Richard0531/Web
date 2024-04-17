@@ -998,7 +998,7 @@ def image(request):
         control = filtered_df_drug['Fail'].astype(int).sum()
         if control <5 and aopi > 25:
             res = 'Passed'
-        elif control >5 and aopi > 25:
+        elif control >6 and aopi > 25:
             res = 'Failed_control'
         elif control <5 and aopi < 25:
             res = 'Failed_aopi'
@@ -1418,7 +1418,7 @@ def image(request):
         control = filtered_df_drug['Fail'].astype(int).sum()
         aopi = aopi1['Viability %'] + aopi2['Viability %']
         aopi = round(aopi.mean() / 2,2)
-        t = 'AOPI Viability %:' + str(aopi)+ ' '  + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' if control <5 and aopi > 25  else 'AOPI Viability %:' + str(aopi) + " " +'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
+        t = 'AOPI Viability %:' + str(aopi)+ ' '  + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' if control <6 and aopi > 25  else 'AOPI Viability %:' + str(aopi) + " " +'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
         fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title= t)
         #fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues")
         fig.update_layout( title_x=0.5)
@@ -1554,7 +1554,7 @@ def qc2(request):
         control = filtered_df_drug['Fail'].astype(int).sum()
         if control <5 and aopi > 25:
             res = 'Passed'
-        elif control >5 and aopi > 25:
+        elif control >6 and aopi > 25:
             res = 'Failed_control'
         elif control <5 and aopi < 25:
             res = 'Failed_aopi'
@@ -1651,14 +1651,14 @@ def qc2(request):
             return dcc.send_file('/opt/pub/temp/mysite/output.pdf')
         else:
             return n_clicks
-    def parse_contents_plate(contents,columns):
+    def parse_contents_plate(contents):
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
-        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=8,usecols = columns)
-    def parse_contents_columns(contents,columns):
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=8)
+    def parse_contents_columns(contents):
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
-        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9,usecols = columns)
+        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9)
     def parse_contents_AOPI(contents):
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
@@ -1673,13 +1673,18 @@ def qc2(request):
     def update_output(contents1,contents2,contents3):
         if contents1 is None or contents2 is None or contents3 is None:
             return 'Upload all files'
+        '''
         columns_df1 = [0,1,4,11,12,13,14,16,17,18,19,20,21,22,23]
         columns_df2 = [0,1,4,18,19]
         columns_df3 = [0,1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,23,24,25,26]
         #columns_df4 = [0,1,4,15,16]
-        df1 = parse_contents_columns(contents2,columns_df1)
-        df2 = parse_contents_columns(contents1,columns_df2)
-        df3 = parse_contents_plate(contents3,columns_df3)
+        '''
+        df1 = parse_contents_columns(contents2)
+        df2 = parse_contents_columns(contents1)
+        df3 = parse_contents_plate(contents3)
+        df1 = df1.fillna('NA')
+        df2 = df2.fillna('NA')
+        df3 = df3.fillna('NA')
         #df4 = parse_contents_columns(contents4,columns_df4)
         columns_to_convert = ['Row', 'Column','Field']
         columns_to_convert_plate = ['Row', 'Column']
@@ -1687,24 +1692,27 @@ def qc2(request):
         df2[columns_to_convert] = df2[columns_to_convert].astype(str)
         #df4[columns_to_convert] = df4[columns_to_convert].astype(str)
         df3[columns_to_convert_plate] = df3[columns_to_convert_plate].astype(str)
-        df1['ID'] = df1['Row'] + df1['Column'] + df1['Field']
-        df1['Well ID'] = df1['Row'] + df1['Column']
-        df2['ID'] = df2['Row'] + df2['Column'] + df2['Field']
-        df3['Well ID'] = df3['Row'] + df3['Column']
+        df1['ID'] = df1['Row'] +'_' +df1['Column'] + '_' +df1['Field']
+        df1['Well ID'] = df1['Row'] + '_'+ df1['Column']
+        df2['ID'] = df2['Row'] + '_' +df2['Column'] + '_'+df2['Field']
+        df3['Well ID'] = df3['Row'] +'_' +df3['Column']
         #df4['ID'] = df4['Row'] + df4['Column'] + df4['Field']
         #columns_to_delete_1 =[2,3,5,6,7,8,9,10,14,22]
-        columns_to_delete_2 = [0,1,2]
+        #columns_to_delete_2 = [0,1,2]
         #columns_to_delete_4 = [0,1,2]
         #columns_to_delete_3 = [2,3,20,21,22,26,27]
         #df1 = df1.drop(df1.columns[columns_to_delete_1], axis=1)
-        df2 = df2.drop(df2.columns[columns_to_delete_2], axis=1)
+        #df2 = df2.drop(df2.columns[columns_to_delete_2], axis=1)
         #df3 = df3.drop(df3.columns[columns_to_delete_3], axis=1)
         #df4 = df4.drop(df4.columns[columns_to_delete_4], axis=1)
         #df = pd.merge(df1, df4, how='left', on='ID')
         df = pd.merge(df1, df2, how='left', on='ID')
+        filtered_columns = [col for col in df.columns if '_y' not in col]
+        df = df[filtered_columns]
+        df.columns = [col.replace('_x', '') for col in df.columns]
         df['Status'] = ''
         for i in range(len(df)):
-            if np.isnan(df.at[i,'Whole Image Population - Empty Ratio-2']):
+            if df.at[i,'Whole Image Population - Empty Ratio-2'] == 'NA':
                 df.at[i,'Status'] = 'Normal'
             elif df.at[i,'Whole Image Population - Peeling Factor-2'] < 0.0001:
                 df.at[i,'Status'] = 'Drug Interaction'
@@ -1899,7 +1907,6 @@ def qc2(request):
                 fig = px.imshow(image,height = 738,width=1291.5,title = t)
                 fig.update_xaxes(showticklabels=False)
                 fig.update_yaxes(showticklabels=False)
-
                 for i in range(1,22):
                     fig.add_annotation(x=(((image.shape[1] /21) * i ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text=str(i+2),showarrow=False,font=dict( size=20,))
 
@@ -1961,18 +1968,22 @@ def qc2(request):
     Input('datatable-interactivity-aopi2', "derived_virtual_data")
     ])
     def update_graphs(data1,data2,data3,aopi1,aopi2):
+        reference = pd.read_csv('static/ref.csv') 
         df = pd.DataFrame(data1)
         df_plate = pd.DataFrame(data2)
+        df_plate = df_plate.drop(columns=['Row', 'Column'])
+        df_plate = pd.merge(reference,df_plate, how = 'left', on = 'Well ID')
+        df_plate = df_plate.fillna('1')
         df_drug = pd.DataFrame(data3)
         aopi1 = pd.DataFrame(aopi1)
         aopi2 = pd.DataFrame(aopi2)
-        cordinator = ['A','B','C','D','E','F','G','','','J','K','L','M','N','O']
+        cordinator = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P']
         filtered_df_drug = df_drug[df_drug['Compound'].str.contains('Control', case=False, regex=False)]
         control = filtered_df_drug['Fail'].astype(int).sum()
         aopi = aopi1['Viability %'] + aopi2['Viability %']
         aopi = round(aopi.mean() / 2,2)
-        t = 'AOPI Viability %:' + str(aopi)+ ' '  + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' if control <5 and aopi > 25  else 'AOPI Viability %:' + str(aopi) + " " +'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
-        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title= t)
+        t = 'AOPI Viability %:' + str(aopi)+ ' '  + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' if control <6 and aopi > 25  else 'AOPI Viability %:' + str(aopi) + " " +'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
+        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 5,zmin = 1,color_continuous_scale="Blues",title= t)
         #fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues")
         fig.update_layout( title_x=0.5)
         fig.update_layout( title=dict(font =dict(size= 25)))
@@ -1985,39 +1996,41 @@ def qc2(request):
         fig.update_yaxes(ticktext=cordinator,tickvals=[2,3,4,5,6,7,8,9,10,11,12,13,14,15])
         fig.update_yaxes(title_text="<b>secondary</b> yaxis title", secondary_y=True)
         fig.update_layout(coloraxis_colorbar=dict(title=None, ticktext=cordinator, tickmode='array', ticks='outside'))
-        if '2' in df['Column'].values:
-            fig.add_shape(type="rect",x0=1.5,y0=1.5,x1=23.5,y1=15.5)
-        else:
-            fig.add_shape(type="rect",x0=2.5,y0=1.5,x1=23.5,y1=15.5)
-        for i in range(3,23,2):
+        fig.add_shape(type="rect",x0=0.5,y0=0.5,x1=24.5,y1=16.5)
+        for i in range(3,24,2):
             fig.add_vline(x=i+0.5,line_width=1)
             fig.add_vline(x=i+1.5,line_width=1, line_dash="dash")
-        for i in range(2,15):
+        fig.add_vline(x=2.5,line_width=1)
+        fig.add_vline(x=1.5,line_width=1, line_dash="dash")
+        for i in range(1,16):
             fig.add_hline(y=i+0.5,line_width=1, line_dash="dash")
 
         fig.add_shape(type="rect",x0=2.5, y0=5.5, x1=3.5, y1=6.5,fillcolor="Grey",),fig.add_shape(type="rect",x0=2.5, y0=13.5, x1=3.5, y1=14.5,fillcolor="Grey",)
-        if '2' in df['Column'].astype(str).values:
-            fig.add_vline(x=2.5,line_width=1)
-            fig.add_shape(type="rect",x0=1.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
-        else:
-            fig.add_shape(type="rect",x0=2.5, y0=7.5, x1=23.5, y1=9.5,fillcolor="White",)
-        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,font=dict(size=15),textangle=-25),
-        fig.add_annotation(x=3, y=9,text='Control',showarrow=False,font=dict(size=15),textangle=-25)
+        fig.add_vline(x=2.5,line_width=1)
+        fig.add_shape(type="rect",x0=0.5, y0=7.5, x1=24.5, y1=9.5,fillcolor="White",)
+        fig.add_annotation(x=3, y=8,text='Control',showarrow=False,font=dict(size=12),textangle=-25),
+        fig.add_annotation(x=3, y=9,text='Control',showarrow=False,font=dict(size=12),textangle=-25)
         for i in range(4,24,2):
             d= df_plate.loc[(df_plate['Row'] == 2) & (df_plate['Column'] == i),'Compound' ].values[0]
-            fig.add_annotation(x=i+0.5, y=8,text=d,showarrow=False,font=dict(size=15),textangle=-25)
-            if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
-                fig.add_shape(type="rect",x0=i-0.5,y0=1.5,x1=i+1.5,y1=7.5, line=dict(color="Red",width = 4),)
-        for i in range(2,16):
-            fig.add_annotation(x=23+1, y=i,text=cordinator[i-1],showarrow=False,font=dict(size=20))
+            if d == '1':
+                d = 'NA'
+            fig.add_annotation(x=i+0.5, y=8,text=d,showarrow=False,font=dict(size=12),textangle=-25)
+            #if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
+                #fig.add_shape(type="rect",x0=i-0.5,y0=1.5,x1=i+1.5,y1=7.5, line=dict(color="Red",width = 4),)
+        for i in range(1,17):
+            fig.add_annotation(x=24+1, y=i,text=cordinator[i-1],showarrow=False,font=dict(size=20))
+        
         for i in range(4,24,2):
             d= df_plate.loc[(df_plate['Row'] == 10) & (df_plate['Column'] == i),'Compound' ].values[0]
-            fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,font=dict(size=15),textangle=-25)
-            if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
-                fig.add_shape(type="rect",x0=i-0.5,y0=9.5,x1=i+1.5,y1=15.5,line=dict(color="Red",width=4))
+            if d == '1':
+                d = 'NA'
+            fig.add_annotation(x=i+0.5, y=9,text=d,showarrow=False,font=dict(size=12),textangle=-25)
+            #if df_drug.loc[df_drug['Compound'] == d,'Status'].values[0] == 'Failed':
+               # fig.add_shape(type="rect",x0=i-0.5,y0=9.5,x1=i+1.5,y1=15.5,line=dict(color="Red",width=4))
         for i in range(len(df_plate)):
             if df_plate.at[i,'Red Flag'] == 'Yes':
                 fig.add_shape(type="rect",x0=df_plate.at[i,'Column']-0.5,y0=df_plate.at[i,'Row']-0.5,x1=df_plate.at[i,'Column']+0.5,y1=df_plate.at[i,'Row']+0.5,line=dict(color="Red",width=4,dash='dot'),)
+        
         file_path = os.path.join(os.getcwd(), 'report_1.png')
         pio.write_image(fig, file_path, format='png')
         return fig
