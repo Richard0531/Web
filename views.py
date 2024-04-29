@@ -955,6 +955,14 @@ def image(request):
     aopi = html.Div([
             html.Div([
              html.Div(children=[html.Div(id='aopi-data-block'),]),]) ], style={'display': 'block'}, id='check-container-aopi')
+    rsd = html.Div([
+            html.Div([
+             html.Div(children=[
+              dcc.Input(id="rsd1",type="number",value = 50, placeholder="RSD #1",debounce =True),]),
+             html.Div(children=[
+              dcc.Input(id="rsd2",type="number",value = 50, placeholder="RSD #2",debounce =True),])
+            ])
+          ])
     app.layout = html.Div([
         dbc.Row([dbc.Col(file_upload)]),
         dcc.Upload(
@@ -975,6 +983,7 @@ def image(request):
             multiple=True
         ),
         dcc.Download( id="download-pdf"),
+        dbc.Row([dbc.Col(rsd)]),
         dbc.Button('PLATE REPORT', id='export-button',size="lg",color="primary",n_clicks=0),
         dbc.Row([dbc.Col(plot_upload)]),
         dbc.Row([dbc.Col(aopi)]),
@@ -986,14 +995,17 @@ def image(request):
         State('datatable-interactivity-3', "derived_virtual_data"),
         State('datatable-interactivity-aopi1', "derived_virtual_data"),
         State('datatable-interactivity-aopi2', "derived_virtual_data"),
+        State("rsd1", "value"),
+        State("rsd2", "value"),
         prevent_initial_call=True
         )
-    def export_to_pdf(n_clicks,data,aopi1,aopi2):
+    def export_to_pdf(n_clicks,data,aopi1,aopi2,rsd1,rsd2):
         df = pd.DataFrame(data)
         aopi1 = pd.DataFrame(aopi1)
         aopi2 = pd.DataFrame(aopi2)
         aopi = aopi1['Viability %'] + aopi2['Viability %']
         aopi = round(aopi.mean() / 2,2)
+        rsd = (rsd1 + rsd2) / 2 
         filtered_df_drug = df[df['Compound'].str.contains('Control', case=False, regex=False)]
         control = filtered_df_drug['Fail'].astype(int).sum()
         if control <5 and aopi > 25:
@@ -1054,12 +1066,21 @@ def image(request):
         if table3_data.shape[0] == 11:
             table3.add_row(('','','',''))
         table3.add_hline()
-        table_comment = Tabular('|c c c c c c c c c c c c|')
-        table_comment.add_hline()
-        table_comment.add_row(('Comments:','','','','','','','','','','',''))
-        table_comment.add_hline()
-        for i in range(0,12):
-            table_comment.add_row('','','','','','','','','','','','')
+        if rsd > 15:
+            table_comment = Tabular('|c c c c c c c c c c c|')
+            table_comment.add_hline()
+            table_comment.add_row(('Comments:','','','','','','','','','',''))
+            table_comment.add_hline()
+            table_comment.add_row(('RSD Warning!','','','','','','','','','',''))
+            for i in range(0,11):
+                table_comment.add_row('','','','','','','','','','','')
+        else:
+            table_comment = Tabular('|c c c c c c c c c c c c|')
+            table_comment.add_hline()
+            table_comment.add_row(('Comments:','','','','','','','','','','',''))
+            table_comment.add_hline()
+            for i in range(0,12):
+                table_comment.add_row('','','','','','','','','','','','')
         table_comment.add_hline()
         #with doc.create(Section('',numbering=False)):
         with doc.create(Tabular('c c c',booktabs=False)) as tables:
@@ -1405,9 +1426,11 @@ def image(request):
     Input('datatable-interactivity-2', "derived_virtual_data"),
     Input('datatable-interactivity-3', "derived_virtual_data"),
     Input('datatable-interactivity-aopi1', "derived_virtual_data"),
-    Input('datatable-interactivity-aopi2', "derived_virtual_data")
+    Input('datatable-interactivity-aopi2', "derived_virtual_data"),
+    Input('rsd1', "value"),
+    Input('rsd2', "value"),
     ])
-    def update_graphs(data1,data2,data3,aopi1,aopi2):
+    def update_graphs(data1,data2,data3,aopi1,aopi2,rsd1,rsd2):
         df = pd.DataFrame(data1)
         df_plate = pd.DataFrame(data2)
         df_drug = pd.DataFrame(data3)
@@ -1418,11 +1441,12 @@ def image(request):
         control = filtered_df_drug['Fail'].astype(int).sum()
         aopi = aopi1['Viability %'] + aopi2['Viability %']
         aopi = round(aopi.mean() / 2,2)
-        t = 'AOPI Viability %:' + str(aopi)+ ' '  + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' if control <6 and aopi > 25  else 'AOPI Viability %:' + str(aopi) + " " +'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
+        rsd = ( float(rsd1) + float(rsd2) ) /2
+        t = 'AOPI Viability %:' + str(aopi)+ ' ' + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' if control <6 and aopi > 25  else 'AOPI Viability %:' + str(aopi) + " " + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
         fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title= t)
         #fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues")
         fig.update_layout( title_x=0.5)
-        fig.update_layout( title=dict(font =dict(size= 25)))
+        fig.update_layout( title=dict(font =dict(size= 20)))
         fig.update(data=[{'customdata': df_plate.pivot('Row', 'Column', 'FOV'),'hovertemplate': 'Coloum: %{x}<br>Row: %{y}<br>FOV: %{customdata}<br><extra></extra>'}])
         fig.update_layout(coloraxis_showscale=False)
         fig.update_layout(height=713,width=1065.5,)
