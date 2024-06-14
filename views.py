@@ -1094,7 +1094,7 @@ def image(request):
         if table3_data.shape[0] == 11:
             table3.add_row(('','','',''))
         table3.add_hline()
-        if res == 'Under Review':
+        if rsd > 15 and res !='Passed_Reviewed' and res != 'Failed_Reviewed':
             table_comment = Tabular('|c c c c c c c c c c c c|')
             table_comment.add_hline()
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
@@ -2345,10 +2345,11 @@ def liver (request):
     df = pd.DataFrame(adata.X.A,index=adata.obs_names,columns = adata.var.features)
     df['Treatment'] = adata.obs.treatment
     df['Sample'] = adata.obs['orig.ident']
-    df['Cell Type'] = adata.obs.celltypist3
+    df['Cell Type'] = adata.obs.combined_celltype
     df[['UMAP1', 'UMAP2']] = pd.DataFrame(adata.obsm['X_umap'],index=adata.obs_names)
     dropdown = list(adata.var.features)
-    dropdown2 = ['ALL'] + list(df['Cell Type'].unique())
+    #dropdown2 = ['ALL'] + list(df['Cell Type'].unique())
+    dropdown2 = ['ALL','Hepatocytes_zone1','Hepatocytes_zone2','Hepatocytes_zone3','Hepatocytes_daHep','Stellate_cells','Endothelial_cells','Fibroblasts','KCs','Cholangiocytes','T_cells','B_cells','Monocytes','Neutrophils','NK_cells','Mesothelial_cells','DCs']
     app = DjangoDash('app_liver',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
     col = [{"label": i , "value": i } for i in dropdown]
     '''
@@ -2523,6 +2524,185 @@ def liver (request):
         return fig
     context = {}
     return render(request, 'catalog/liver.html',context)
+@login_required(login_url='/accounts/login/')
+def liver_MP (request):
+    adata = sc.read_h5ad('static/adata_liver_MP.h5ad')
+    df = pd.DataFrame(adata.X.A,index=adata.obs_names,columns = adata.var.index)
+    df['Treatment'] = adata.obs.group
+    df['Sample'] = adata.obs['sample']
+    df['Cell Type'] = adata.obs.combined_celltype
+    df[['UMAP1', 'UMAP2']] = pd.DataFrame(adata.obsm['X_umap'],index=adata.obs_names)
+    dropdown = list(adata.var.index)
+    dropdown2 = ['ALL','Hepatocytes_zone1','Hepatocytes_zone2','Hepatocytes_zone3','Hepatocytes_daHep','Stellate_cells','Endothelial_cells','Fibroblasts','KCs','Cholangiocytes','T_cells','B_cells','Monocytes','Neutrophils','NK_cells','Mesothelial_cells','DCs']
+    app = DjangoDash('app_liver_MP',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
+    col = [{"label": i , "value": i } for i in dropdown]
+    app.layout = html.Div([
+        html.Div([dcc.Dropdown(dropdown2,['ALL'],multi=True,placeholder='Select Cell Type',id='cell-type',style={'width':'50%'})]),
+        html.Div([dcc.Dropdown(multi=False,placeholder='Enter Gene Name',id='editing-columns-name',style={'width':'50%'})]),
+        html.Div([dcc.Dropdown(multi=False,options=[1,2,3,4,5,6,7,8,9,10],value=2,id='point-size',style={'width':'50%'})]),
+        html.Div([dcc.Checklist(id='nonZero',options=['Remove Zero'],value='',style={'width': '10%',})]),
+        #dbc.Row([dbc.Col(table_control)]),
+        html.Div([
+        dcc.Graph(id="indicator-graphic1",config={"displaylogo": False,'toImageButtonOptions':{
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+        dcc.Graph(id="indicator-graphic2",config={"displaylogo": False,'toImageButtonOptions': {
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+                  ],style={'display': 'flex'}),
+        html.Div([
+        dcc.Graph(id="indicator-graphic3",config={"displaylogo": False,'toImageButtonOptions':{
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+        dcc.Graph(id="indicator-graphic4",config={"displaylogo": False,'toImageButtonOptions': {
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+                  ],style={'display': 'flex'}),
+        dcc.Graph(id="indicator-graphic5",config={"displaylogo": False,'toImageButtonOptions': {
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+    ])
+    @app.callback(
+    Output("editing-columns-name", "options"),
+    Input("editing-columns-name", "search_value")
+    )
+    def update_options(search_value):
+        if not search_value:
+            raise PreventUpdate
+        elif len(search_value)<2:
+            raise PreventUpdate 
+        return [o for o in col if search_value in o["label"]]
+    @app.callback(
+    Output('indicator-graphic1', "figure"),
+    Input('cell-type', "value"),
+    #Input('editing-columns-button', "n_clicks"),
+    Input('point-size', "value"),
+    Input('editing-columns-name', 'value'),
+    Input('nonZero', 'value'),
+    )
+    def update_graphs1(celltype,psize,value,zero):
+        fig = []
+        if 'ALL' in celltype:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0], x="UMAP1", y="UMAP2",color = value,
+                             color_continuous_scale = 'balance')
+            else:
+                fig = px.scatter(df, x="UMAP1", y="UMAP2",color = value,
+                             color_continuous_scale = 'balance')
+        else:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0][df[df[value] != 0]['Cell Type'].isin(celltype)], 
+                             x="UMAP1", y="UMAP2",color = value,
+                             color_continuous_scale = 'balance')
+            else:
+                fig = px.scatter(df[df['Cell Type'].isin(celltype)], x="UMAP1", y="UMAP2",
+                              color = value,color_continuous_scale = 'balance')
+        fig.update_traces(marker=dict(size=psize))
+        fig.update_traces(hoverinfo='none',hovertemplate=None)
+        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        fig.update_layout(height = 600,width=600 )    
+        return fig    
+    @app.callback(
+    Output('indicator-graphic2', "figure"),
+    Input('cell-type', "value"),
+    #Input('editing-columns-button', "n_clicks"),
+    Input('point-size', "value"),
+    Input('editing-columns-name', 'value'),
+    Input('nonZero', 'value'),
+    )
+    def update_graphs2(celltype,psize,value,zero):
+        fig = []
+        if 'ALL' in celltype:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0], x="UMAP1", y="UMAP2",color = 'Cell Type')
+            else:
+                fig = px.scatter(df, x="UMAP1", y="UMAP2",color = 'Cell Type')
+        else:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0][df[df[value] != 0]['Cell Type'].isin(celltype)], 
+                                 x="UMAP1", y="UMAP2",color = 'Cell Type')
+            else:
+                fig = px.scatter(df[df['Cell Type'].isin(celltype)], x="UMAP1", y="UMAP2",color = 'Cell Type')
+        fig.update_traces(marker=dict(size=psize))
+        fig.update_traces(hoverinfo='none',hovertemplate=None)
+        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        fig.update_layout(height = 600,width=700 )
+        return fig
+    @app.callback(
+    Output('indicator-graphic3', "figure"),
+    Input('cell-type', "value"),
+    #Input('editing-columns-button', "n_clicks"),
+    Input('point-size', "value"),
+    Input('editing-columns-name', 'value'),
+    Input('nonZero', 'value'),
+    )
+    def update_graphs3(celltype,psize,value,zero):
+        fig = []
+        if 'ALL' in celltype:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0], x="UMAP1", y="UMAP2",color = 'Treatment')
+            else:
+                fig = px.scatter(df, x="UMAP1", y="UMAP2",color = 'Treatment')
+        else:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0][df[df[value] != 0]['Cell Type'].isin(celltype)],
+                                 x="UMAP1", y="UMAP2",color = 'Treatment')
+            else:
+                fig = px.scatter(df[df['Cell Type'].isin(celltype)], x="UMAP1", y="UMAP2",color = 'Treatment')
+        fig.update_traces(marker=dict(size=psize))
+        fig.update_traces(hoverinfo='none',hovertemplate=None)
+        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        fig.update_layout(height = 600,width=699)
+        return fig
+    @app.callback(
+    Output('indicator-graphic4', "figure"),
+    Input('cell-type', "value"),
+    #Input('editing-columns-button', "n_clicks"),
+    Input('point-size', "value"),
+    Input('editing-columns-name', 'value'),
+    Input('nonZero', 'value'),
+    )
+    def update_graphs4(celltype,psize,value,zero):
+        fig = []
+        if 'ALL' in celltype:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0], x="UMAP1", y="UMAP2",color = 'Sample')
+            else:
+                fig = px.scatter(df, x="UMAP1", y="UMAP2",color = 'Sample')
+        else:
+            if 'Remove Zero' in zero:
+                fig = px.scatter(df[df[value] != 0][df[df[value] != 0]['Cell Type'].isin(celltype)],
+                                 x="UMAP1", y="UMAP2",color = 'Sample')
+            else:
+                fig = px.scatter(df[df['Cell Type'].isin(celltype)], x="UMAP1", y="UMAP2",color = 'Sample')
+        fig.update_traces(marker=dict(size=psize))
+        fig.update_traces(hoverinfo='none',hovertemplate=None)
+        fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+        fig.update_layout(height = 600,width=699)
+        return fig
+    @app.callback(
+    Output('indicator-graphic5', "figure"),
+    Input('cell-type', "value"),
+    #Input('editing-columns-button', "n_clicks"),
+    Input('editing-columns-name', 'value'),
+    Input('nonZero', 'value'),
+    )
+    def update_graphs5(celltype,value,zero):
+        fig = []
+        if 'ALL' in celltype:
+            fig = []
+        else:
+            if 'Remove Zero' in zero:
+                fig = px.violin(df[df[value] != 0][df[df[value] != 0]['Cell Type'].isin(celltype)], x= 'Cell Type',y=value,
+                                color = 'Treatment',points="all")
+            else:
+                fig = px.violin(df[df['Cell Type'].isin(celltype)], x= 'Cell Type',y=value,
+                                color = 'Treatment',points="all")
+            fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
+            fig.update_layout(height = 540,width=1620 )
+        return fig
+    context = {}
+    return render(request, 'catalog/liver_MP.html',context)
 @login_required(login_url='/accounts/login/')
 def volcano (request):   
     df = pd.read_csv('static/summary2.csv') 
