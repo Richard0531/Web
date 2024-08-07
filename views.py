@@ -964,6 +964,19 @@ def image(request):
               dcc.Input(id="rsd2",type="number",value = 0, placeholder="RSD #2",debounce =True)],style={'width': '5%', 'display': 'inline-block'})
             ])
           ],style={'display': 'block'}, id='check-container2')
+    cell = html.Div([
+            html.Div([
+
+             html.Div(children=[
+              dcc.Input(id="cell1",type="number",value = 0, placeholder="Ctrl #1",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
+             html.Div(children=[
+              dcc.Input(id="cell2",type="number",value = 0, placeholder="Ctrl #2",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
+             html.Div(children=[
+              dcc.Input(id="cell3",type="number",value = 0, placeholder="Ctrl #3",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
+             html.Div(children=[
+              dcc.Input(id="cell4",type="number",value = 0, placeholder="Ctrl #4",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
+            ])
+          ],style={'display': 'block'}, id='check-container3')
     user_options = dcc.RadioItems(['DEFAULT','PASS','FAIL'], 'DEFAULT',id = "userchoice", inline=True)
     app.layout = html.Div([
         dbc.Row([dbc.Col(file_upload)]),
@@ -987,6 +1000,8 @@ def image(request):
         dcc.Download( id="download-pdf"),
         html.I("Input Two RSD values"),
         dbc.Row([dbc.Col(rsd)]),
+        html.I("Input Ctrl values"),
+        dbc.Row([dbc.Col(cell)]),
         dbc.Row([dbc.Col(user_options)]),
         dbc.Button('PLATE REPORT', id='export-button',size="lg",color="primary",n_clicks=0),
         dbc.Row([dbc.Col(plot_upload)]),
@@ -1001,15 +1016,20 @@ def image(request):
         State('datatable-interactivity-aopi2', "derived_virtual_data"),
         State("rsd1", "value"),
         State("rsd2", "value"),
+        State("cell1", "value"),
+        State("cell2", "value"),
+        State("cell3", "value"),
+        State("cell4", "value"),
         State("userchoice", "value"), 
         prevent_initial_call=True
         )
-    def export_to_pdf(n_clicks,data,aopi1,aopi2,rsd1,rsd2,choice):
+    def export_to_pdf(n_clicks,data,aopi1,aopi2,rsd1,rsd2,cell1,cell2,cell3,cell4,choice):
         df = pd.DataFrame(data)
         aopi1 = pd.DataFrame(aopi1)
         aopi2 = pd.DataFrame(aopi2)
         aopi = aopi1['Viability %'] + aopi2['Viability %']
         aopi = round(aopi.mean() / 2,2)
+        cell = (cell1 + cell2 + cell3 + cell4) / 4
         rsd = (rsd1 + rsd2) / 2 
         filtered_df_drug = df[df['Compound'].str.contains('Control', case=False, regex=False)]
         control = filtered_df_drug['Fail'].astype(int).sum()
@@ -1044,6 +1064,14 @@ def image(request):
                 res = 'Passed'
             else:
                 res = 'Failed'
+        if cell >= 500:
+            res = res
+        elif cell < 500 and res == 'Passed_Reviewed':
+            res = 'Passed_Reviewed'
+        elif cell < 500 and res == 'Failed_Reviewed':
+            res = 'Failed_Reviewed'
+        else:
+            res = 'Failed'
         table2_data = df.iloc[:12]
         table3_data = df.iloc[12:]
         geometry_options = {'tmargin':'0.5cm','lmargin':'0.5cm','rmargin':'0.5cm','paperwidth':'612pt','paperheight':'792pt'}
@@ -1100,43 +1128,77 @@ def image(request):
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
             table_comment.add_hline()
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'RSD is greater than the threshold of 15%'),))
-            for i in range(0,11):
+            if cell > 500:
+                for i in range(0,11):
+                    table_comment.add_row('','','','','','','','','','','','')
+            else:
                 table_comment.add_row('','','','','','','','','','','','')
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is'),))
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'less than 500.'),))
+                for i in range(0,8):
+                    table_comment.add_row('','','','','','','','','','','','')
         elif res =='Passed_Reviewed' : 
             table_comment = Tabular('|c c c c c c c c c c c c|')
             table_comment.add_hline()
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
             table_comment.add_hline()
-            table_comment.add_row((MultiColumn(12, align='|l|',data = 'RSD is greater than the threshold of 15%'),))
+            if rsd > 15:
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'RSD is greater than the threshold of 15%'),))
+            else:
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'Need review for other reasons'),))
             table_comment.add_row('','','','','','','','','','','','')
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'The QC status for this plate has been'),))
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'changed from "Under Review" to "Pass".'),))
             table_comment.add_row('','','','','','','','','','','','')
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'The Pharmacotyping Team has completed'),))
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'its review.'),))
-            for i in range(0,5):
+            if cell > 500:
+                for i in range(0,5):
+                    table_comment.add_row('','','','','','','','','','','','')
+            else:
                 table_comment.add_row('','','','','','','','','','','','')
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is'),))
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'less than 500.'),))
+                for i in range(0,2):
+                    table_comment.add_row('','','','','','','','','','','','')
         elif res =='Failed_Reviewed' :
             table_comment = Tabular('|c c c c c c c c c c c c|')
             table_comment.add_hline()
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
             table_comment.add_hline()
-            table_comment.add_row((MultiColumn(12, align='|l|',data = 'RSD is greater than the threshold of 15%'),))
+            if rsd > 15:
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'RSD is greater than the threshold of 15%'),))
+            else:
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'Need review for other reasons'),))
             table_comment.add_row('','','','','','','','','','','','')
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'The QC status for this plate has been'),))
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'changed from "Under Review" to "Fail".'),))
             table_comment.add_row('','','','','','','','','','','','')
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'The Pharmacotyping Team has completed'),))
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'its review.'),))
-            for i in range(0,5):
+            if cell > 500:
+                for i in range(0,5):
+                    table_comment.add_row('','','','','','','','','','','','')
+            else:
                 table_comment.add_row('','','','','','','','','','','','')
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is'),))
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'less than 500.'),))
+                for i in range(0,2):
+                    table_comment.add_row('','','','','','','','','','','','')
         else:
             table_comment = Tabular('|c c c c c c c c c c c c|')
             table_comment.add_hline()
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
             table_comment.add_hline()
-            for i in range(0,12):
+            if cell > 500:
+                for i in range(0,12):
+                    table_comment.add_row('','','','','','','','','','','','')
+            else:
                 table_comment.add_row('','','','','','','','','','','','')
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is'),))
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'less than 500'),))
+                for i in range(0,9):
+                    table_comment.add_row('','','','','','','','','','','','')
         table_comment.add_hline()
         #with doc.create(Section('',numbering=False)):
         with doc.create(Tabular('c c c',booktabs=False)) as tables:
@@ -1597,6 +1659,16 @@ def qc2(request):
     aopi = html.Div([
             html.Div([
              html.Div(children=[html.Div(id='aopi-data-block'),]),]) ], style={'display': 'block'}, id='check-container-aopi')
+    rsd = html.Div([
+            html.Div([
+          
+             html.Div(children=[
+              dcc.Input(id="rsd1",type="number",value = 0, placeholder="RSD #1",debounce =True)],style={'width': '10%', 'display': 'inline-block'}),
+             html.Div(children=[
+              dcc.Input(id="rsd2",type="number",value = 0, placeholder="RSD #2",debounce =True)],style={'width': '5%', 'display': 'inline-block'})
+            ])
+          ],style={'display': 'block'}, id='check-container2')
+    user_options = dcc.RadioItems(['DEFAULT','PASS','FAIL'], 'DEFAULT',id = "userchoice", inline=True)
     app.layout = html.Div([
         dbc.Row([dbc.Col(file_upload)]),
         dcc.Upload(
@@ -1617,6 +1689,9 @@ def qc2(request):
             multiple=True
         ),
         dcc.Download( id="download-pdf"),
+        html.I("Input Two RSD values"),
+        dbc.Row([dbc.Col(rsd)]),
+        dbc.Row([dbc.Col(user_options)]),
         dbc.Button('PLATE REPORT', id='export-button',size="lg",color="primary",n_clicks=0),
         dbc.Row([dbc.Col(plot_upload)]),
         dbc.Row([dbc.Col(aopi)]),
@@ -1628,24 +1703,51 @@ def qc2(request):
         State('datatable-interactivity-3', "derived_virtual_data"),
         State('datatable-interactivity-aopi1', "derived_virtual_data"),
         State('datatable-interactivity-aopi2', "derived_virtual_data"),
+        State("rsd1", "value"),
+        State("rsd2", "value"),
+        State("userchoice", "value"),
         prevent_initial_call=True
         )
-    def export_to_pdf(n_clicks,data,aopi1,aopi2):
+    def export_to_pdf(n_clicks,data,aopi1,aopi2,rsd1,rsd2,choice):
         df = pd.DataFrame(data)
         aopi1 = pd.DataFrame(aopi1)
         aopi2 = pd.DataFrame(aopi2)
         aopi = aopi1['Viability %'] + aopi2['Viability %']
         aopi = round(aopi.mean() / 2,2)
+        rsd = (rsd1 + rsd2) / 2 
         filtered_df_drug = df[df['Compound'].str.contains('Control', case=False, regex=False)]
         control = filtered_df_drug['Fail'].astype(int).sum()
         if control <5 and aopi > 25:
-            res = 'Passed'
+            if choice == 'DEFAULT':
+                if rsd > 15:
+                    res = 'Under Review'
+                else:
+                    res = 'Passed'
+            elif choice == 'PASS':
+                res = 'Passed_Reviewed'
+            else:
+                res = 'Failed_Reviewed'
         elif control >6 and aopi > 25:
-            res = 'Failed_control'
+            if choice == 'DEFAULT':
+                res = 'Failed_control'
+            elif choice == 'PASS':
+                res = 'Passed'
+            else:
+                res = 'Failed_control'
         elif control <5 and aopi < 25:
-            res = 'Failed_aopi'
+            if choice == 'DEFAULT':
+                res = 'Failed_aopi'
+            elif choice == 'PASS':
+                res = 'Passed'
+            else:
+                res = 'Failed_aopi'
         else:
-            res = 'Failed'
+            if choice == 'DEFAULT':
+                res = 'Failed'
+            elif choice == 'PASS':
+                res = 'Passed'
+            else:
+                res = 'Failed'
         table2_data = df.iloc[:12]
         table3_data = df.iloc[12:]
         geometry_options = {'tmargin':'0.5cm','lmargin':'0.5cm','rmargin':'0.5cm','paperwidth':'612pt','paperheight':'792pt'}
@@ -1696,12 +1798,49 @@ def qc2(request):
         if table3_data.shape[0] == 11:
             table3.add_row(('','','',''))
         table3.add_hline()
-        table_comment = Tabular('|c c c c c c c c c c c c|')
-        table_comment.add_hline()
-        table_comment.add_row(('Comments:','','','','','','','','','','',''))
-        table_comment.add_hline()
-        for i in range(0,12):
+        if rsd > 15 and res !='Passed_Reviewed' and res != 'Failed_Reviewed':
+            table_comment = Tabular('|c c c c c c c c c c c c|')
+            table_comment.add_hline()
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
+            table_comment.add_hline()
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'RSD is greater than the threshold of 15%'),))
+            for i in range(0,11):
+                table_comment.add_row('','','','','','','','','','','','')
+        elif res =='Passed_Reviewed' : 
+            table_comment = Tabular('|c c c c c c c c c c c c|')
+            table_comment.add_hline()
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
+            table_comment.add_hline()
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'RSD is greater than the threshold of 15%'),))
             table_comment.add_row('','','','','','','','','','','','')
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'The QC status for this plate has been'),))
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'changed from "Under Review" to "Pass".'),))
+            table_comment.add_row('','','','','','','','','','','','')
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'The Pharmacotyping Team has completed'),))
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'its review.'),))
+            for i in range(0,5):
+                table_comment.add_row('','','','','','','','','','','','')
+        elif res =='Failed_Reviewed' :
+            table_comment = Tabular('|c c c c c c c c c c c c|')
+            table_comment.add_hline()
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
+            table_comment.add_hline()
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'RSD is greater than the threshold of 15%'),))
+            table_comment.add_row('','','','','','','','','','','','')
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'The QC status for this plate has been'),))
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'changed from "Under Review" to "Fail".'),))
+            table_comment.add_row('','','','','','','','','','','','')
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'The Pharmacotyping Team has completed'),))
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'its review.'),))
+            for i in range(0,5):
+                table_comment.add_row('','','','','','','','','','','','')
+        else:
+            table_comment = Tabular('|c c c c c c c c c c c c|')
+            table_comment.add_hline()
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
+            table_comment.add_hline()
+            for i in range(0,12):
+                table_comment.add_row('','','','','','','','','','','','')
         table_comment.add_hline()
         #with doc.create(Section('',numbering=False)):
         with doc.create(Tabular('c c c',booktabs=False)) as tables:
@@ -1725,12 +1864,18 @@ def qc2(request):
         with doc.create(Figure(position='h!')) as qc_picture:
             if res == 'Passed':
                 qc_picture.add_image('/opt/pub/temp/mysite/Passed.png',width='160px')
+            elif res == 'Passed_Reviewed':
+                qc_picture.add_image('/opt/pub/temp/mysite/Passed.png',width='160px')
+            elif res == 'Failed_Reviewed':
+                qc_picture.add_image('/opt/pub/temp/mysite/Failed.png',width='170px')
             elif res == 'Failed_control':
                 qc_picture.add_image('/opt/pub/temp/mysite/Failed-controlwells.png',width='220px')
             elif res == 'Failed_aopi':
                 qc_picture.add_image('/opt/pub/temp/mysite/Failed-aopi.png',width='220px')
+            elif res == 'Failed':
+                qc_picture.add_image('/opt/pub/temp/mysite/Failed.png',width='170px')
             else:
-                qc_picture.add_image('/opt/pub/temp/mysite/Failed.png',width='220px')
+                qc_picture.add_image('/opt/pub/temp/mysite/Review.png',width='150px')
         pdf_filename = 'output'
         doc.generate_pdf(pdf_filename, clean_tex=True)
         if n_clicks > 0:
@@ -2526,14 +2671,14 @@ def liver (request):
     return render(request, 'catalog/liver.html',context)
 @login_required(login_url='/accounts/login/')
 def liver_MP (request):
-    adata = sc.read_h5ad('static/adata_liver_MP.h5ad')
+    adata = sc.read_h5ad('static/adata_liver_MP2.h5ad')
     df = pd.DataFrame(adata.X.A,index=adata.obs_names,columns = adata.var.index)
     df['Treatment'] = adata.obs.group
     df['Sample'] = adata.obs['sample']
     df['Cell Type'] = adata.obs.combined_celltype
     df[['UMAP1', 'UMAP2']] = pd.DataFrame(adata.obsm['X_umap'],index=adata.obs_names)
     dropdown = list(adata.var.index)
-    dropdown2 = ['ALL','Hepatocytes_zone1','Hepatocytes_zone2','Hepatocytes_zone3','Hepatocytes_daHep','Stellate_cells','Endothelial_cells','Fibroblasts','KCs','Cholangiocytes','T_cells','B_cells','Monocytes','Neutrophils','NK_cells','Mesothelial_cells','DCs']
+    dropdown2 = ['ALL','Hepatocytes_zone1','Hepatocytes_zone2','Hepatocytes_zone3','Hepatocytes_daHep','Hepatocytes_MitoHigh','Hepatocytes_Stat1+','Stellate_cells','Endothelial_cells','Fibroblasts','KCs','Cholangiocytes','T_cells','B_cells','Monocytes','Neutrophils','NK_cells','Mesothelial_cells','DCs']
     app = DjangoDash('app_liver_MP',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
     col = [{"label": i , "value": i } for i in dropdown]
     app.layout = html.Div([
