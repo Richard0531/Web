@@ -966,22 +966,22 @@ def image(request):
             html.Div([
           
              html.Div(children=[
-              dcc.Input(id="rsd1",type="number",value = 0, placeholder="RSD #1",debounce =True)],style={'width': '10%', 'display': 'inline-block'}),
+              dcc.Input(id="rsd1",type="number",value = 1, placeholder="RSD #1",debounce =True)],style={'width': '10%', 'display': 'inline-block'}),
              html.Div(children=[
-              dcc.Input(id="rsd2",type="number",value = 0, placeholder="RSD #2",debounce =True)],style={'width': '5%', 'display': 'inline-block'})
+              dcc.Input(id="rsd2",type="number",value = 1, placeholder="RSD #2",debounce =True)],style={'width': '5%', 'display': 'inline-block'})
             ])
           ],style={'display': 'block'}, id='check-container2')
     cell = html.Div([
             html.Div([
 
              html.Div(children=[
-              dcc.Input(id="cell1",type="number",value = 0, placeholder="Ctrl #1",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
+              dcc.Input(id="cell1",type="number",value = 1, placeholder="Ctrl #1",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
              html.Div(children=[
-              dcc.Input(id="cell2",type="number",value = 0, placeholder="Ctrl #2",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
+              dcc.Input(id="cell2",type="number",value = 1, placeholder="Ctrl #2",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
              html.Div(children=[
-              dcc.Input(id="cell3",type="number",value = 0, placeholder="Ctrl #3",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
+              dcc.Input(id="cell3",type="number",value = 1, placeholder="Ctrl #3",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
              html.Div(children=[
-              dcc.Input(id="cell4",type="number",value = 0, placeholder="Ctrl #4",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
+              dcc.Input(id="cell4",type="number",value = 1, placeholder="Ctrl #4",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
             ])
           ],style={'display': 'block'}, id='check-container3')
     user_options = dcc.RadioItems(['DEFAULT','PASS','FAIL'], 'DEFAULT',id = "userchoice", inline=True)
@@ -1631,22 +1631,41 @@ def image(request):
     Input('datatable-interactivity-3', "derived_virtual_data"),
     Input('datatable-interactivity-aopi1', "derived_virtual_data"),
     Input('datatable-interactivity-aopi2', "derived_virtual_data"),
+    Input("datatable-interactivity-control", "derived_virtual_data"),
     Input('rsd1', "value"),
     Input('rsd2', "value"),
+    Input("cell1", "value"),
+    Input("cell2", "value"),
+    Input("cell3", "value"),
+    Input("cell4", "value"),
+    Input("plate_num", "value"),
     ])
-    def update_graphs(data1,data2,data3,aopi1,aopi2,rsd1,rsd2):
+    def update_graphs(data1,data2,data3,aopi1,aopi2,control,rsd1,rsd2,cell1,cell2,cell3,cell4,plate):
         df = pd.DataFrame(data1)
         df_plate = pd.DataFrame(data2)
         df_drug = pd.DataFrame(data3)
         aopi1 = pd.DataFrame(aopi1)
         aopi2 = pd.DataFrame(aopi2)
+        σ1 = abs(rsd1 * 3 -100)
+        σ2 = abs(rsd2 * 3 -100)
+        control = pd.DataFrame(control)
+        top_via = control.at[0,'Viable ALL']
+        bottom_via = control.at[1,'Viable ALL']
+        if plate == 'P1':
+            top = round(top_via / cell1 *100,2)
+            bottom = round(bottom_via / cell2 *100,2)
+            control_status = 'control_passed' if (top < σ1 and bottom < σ1 ) else 'control_failed'
+        else:
+            top = round(top_via/ cell3 *100,2) 
+            bottom = round(bottom_via / cell4 *100,2)
+            control_status = 'control_passed' if (top < σ2 and bottom < σ2 ) else 'control_failed'
         cordinator = ['A','B','C','D','E','F','G','','','J','K','L','M','N','O'] 
         filtered_df_drug = df_drug[df_drug['Compound'].str.contains('Control', case=False, regex=False)]
         control = filtered_df_drug['Fail'].astype(int).sum()
         aopi = aopi1['Viability %'] + aopi2['Viability %']
         aopi = round(aopi.mean() / 2,2)
-        rsd = ( float(rsd1) + float(rsd2) ) /2
-        t = 'AOPI Viability %:' + str(aopi)+ ' ' + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' if control <6 and aopi > 25  else 'AOPI Viability %:' + str(aopi) + " " + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
+        rsd = round(( float(rsd1) + float(rsd2) ) /2,2)
+        t = 'AOPI Viability %:' + str(aopi)+ ' ' + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' if control <6 and aopi > 25 and control_status == 'control_passed'  else 'AOPI Viability %:' + str(aopi) + " " + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
         #df_plate = df_plate[df_plate['Compound'] != 'Staurosporine']
         df_plate = df_plate.query("Compound != 'Staurosporine'")
         df_plate = df_plate.reset_index(drop=True)
