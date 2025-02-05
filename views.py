@@ -984,7 +984,7 @@ def image(request):
               dcc.Input(id="cell4",type="number",value = 1, placeholder="Ctrl #4",debounce =True)],style={'width': '5%', 'display': 'inline-block'}),
             ])
           ],style={'display': 'block'}, id='check-container3')
-    user_options = dcc.RadioItems(['DEFAULT','PASS','FAIL'], 'DEFAULT',id = "userchoice", inline=True)
+    user_options = dcc.RadioItems(['DEFAULT','PASS','FAIL','REVIEW'], 'DEFAULT',id = "userchoice", inline=True)
     sd = html.Div(id="sd_values")
     app.layout = html.Div([
         dbc.Row([dbc.Col(file_upload)]),
@@ -1152,6 +1152,8 @@ def image(request):
             res = 'Failed_Reviewed'
         else:
             res = 'Failed'
+        if choice == 'REVIEW':
+            res = 'Under Review'
         table2_data = df.iloc[:12]
         table3_data = df.iloc[12:]
         geometry_options = {'tmargin':'0.5cm','lmargin':'0.5cm','rmargin':'0.5cm','paperwidth':'612pt','paperheight':'792pt'}
@@ -1327,7 +1329,10 @@ def image(request):
     def parse_contents_columns(contents,columns):
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
-        return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9,usecols = columns)
+        if len(decoded) != 0:
+            return pd.read_csv(io.StringIO(decoded.decode('utf-8')),sep='\t',skiprows=9,usecols = columns)
+        else:
+            return pd.read_csv('/opt/pub/temp/mysite/Objects_Population - Drug Interaction FOV - empty.txt',sep='\t',skiprows=9,usecols = columns)
     def parse_contents_AOPI(contents):
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
@@ -1380,10 +1385,17 @@ def image(request):
             else:
                 df.at[i,'Status'] = 'Peeling'
         summary_table = df.pivot_table(index='Well ID', columns='Status', aggfunc='size', fill_value=0)
-        if 'Peeling' in summary_table:
-            summary_table = summary_table
+        if 'Drug Interaction' in summary_table: 
+            if 'Peeling' in summary_table:
+                summary_table = summary_table
+            else:
+               summary_table['Peeling'] = 0
         else:
-            summary_table['Peeling'] = 0
+            if 'Peeling' in summary_table:
+                summary_table['Drug Interaction'] = 0
+            else:
+                summary_table['Drug Interaction'] = 0
+                summary_table['Peeling'] = 0
         summary_table['Normal'] = 9-summary_table['Drug Interaction'] - summary_table['Peeling']
         summary_table = summary_table.reset_index()
         df_plate = pd.merge(df3, summary_table, how='left', on='Well ID')
@@ -1665,7 +1677,10 @@ def image(request):
         aopi = aopi1['Viability %'] + aopi2['Viability %']
         aopi = round(aopi.mean() / 2,2)
         rsd = round(( float(rsd1) + float(rsd2) ) /2,2)
-        t = 'AOPI Viability %:' + str(aopi)+ ' ' + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' if control <6 and aopi > 25 and control_status == 'control_passed'  else 'AOPI Viability %:' + str(aopi) + " " + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
+        if control <6 and aopi > 25 and control_status == 'control_passed':
+            t = 'Staurosporin viability% Top: ' + str(top) +'% Bottom: '+ str(bottom)+ '<br>' + 'AOPI Viability %:' + str(aopi)+ ' ' + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' 
+        else:
+            t = 'Staurosporin viability% Top: ' + str(top) +'% Bottom: '+ str(bottom)+ '<br>' + 'AOPI Viability %:' +str(aopi) + " " + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
         #df_plate = df_plate[df_plate['Compound'] != 'Staurosporine']
         df_plate = df_plate.query("Compound != 'Staurosporine'")
         df_plate = df_plate.reset_index(drop=True)
@@ -1679,7 +1694,7 @@ def image(request):
         fig.update_layout(coloraxis_showscale=False)
         fig.update_layout(height=713,width=1065.5,)
         fig.update_layout(plot_bgcolor='rgba(0, 0, 0, 0)',)
-        fig.update_layout(margin=dict(l=0, r=0, t=40, b=0),)
+        fig.update_layout(margin=dict(l=0, r=0, t=70, b=0),)
         fig.update_layout(yaxis_title=None,xaxis_title=None,font=dict(size=20),xaxis=dict(tickmode='linear'),yaxis=dict(tickmode='linear',side="left"))
         fig.update_yaxes(ticktext=cordinator,tickvals=[2,3,4,5,6,7,8,9,10,11,12,13,14,15])
         fig.update_yaxes(title_text="<b>secondary</b> yaxis title", secondary_y=True)
