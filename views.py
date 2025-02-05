@@ -1071,7 +1071,7 @@ def image(request):
                 σ2 = abs((((rsd2 * cell4 / 100) * 3) / cell4 * 100 ) - 100)
                 top = round(top_via/ cell3 *100,2)
                 bottom = round(bottom_via / cell4 *100,2)
-            text = f'-3σ  Top: {σ1}%  Bottom: {σ2}% , Staurosporin viability%  Top: {top}%  Bottom: {bottom}%'
+            text = f'-3σ  Top: {σ1}%  Bottom: {σ2}% , Staurosporin viability Top: {top}%  Bottom: {bottom}%'
         return text
     @app.callback(
         Output("download-pdf", 'data'),
@@ -1583,8 +1583,8 @@ def image(request):
                 fig.update_xaxes(showticklabels=False)
                 fig.update_yaxes(showticklabels=False)
                 
-                for i in range(1,23):
-                    fig.add_annotation(x=(((image.shape[1] /22) * i ) - (image.shape[1] /44)), y=(image.shape[0] + (image.shape[0] /24)),text=str(i+1),showarrow=False,font=dict( size=20,))
+                for i in range(1,22):
+                    fig.add_annotation(x=(((image.shape[1] /21) * i ) - (image.shape[1] /42)), y=(image.shape[0] + (image.shape[0] /24)),text=str(i+2),showarrow=False,font=dict( size=20,))
                 
                 cordinator = ['A','B','C','D','E','F','G','J','K','L','M','N','O']
                 for i in range(1,13):
@@ -1678,9 +1678,9 @@ def image(request):
         aopi = round(aopi.mean() / 2,2)
         rsd = round(( float(rsd1) + float(rsd2) ) /2,2)
         if control <6 and aopi > 25 and control_status == 'control_passed':
-            t = 'Staurosporin viability% Top: ' + str(top) +'% Bottom: '+ str(bottom)+ '<br>' + 'AOPI Viability %:' + str(aopi)+ ' ' + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' 
+            t = 'Staurosporin viability Top: ' + str(top) +'% Bottom: '+ str(bottom)+ '%'+ '<br>' + 'AOPI Viability %:' + str(aopi)+ ' ' + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' 
         else:
-            t = 'Staurosporin viability% Top: ' + str(top) +'% Bottom: '+ str(bottom)+ '<br>' + 'AOPI Viability %:' +str(aopi) + " " + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
+            t = 'Staurosporin viability Top: ' + str(top) +'% Bottom: '+ str(bottom)+ '%' + '<br>' + 'AOPI Viability %:' +str(aopi) + " " + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
         #df_plate = df_plate[df_plate['Compound'] != 'Staurosporine']
         df_plate = df_plate.query("Compound != 'Staurosporine'")
         df_plate = df_plate.reset_index(drop=True)
