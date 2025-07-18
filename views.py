@@ -109,6 +109,64 @@ def sample (request):
     context = {}
     return render(request, 'catalog/sample.html', context=context)
 @login_required(login_url='/accounts/login/')
+def subtype (request):
+    df_subtype = pd.read_csv('static/Web_subtype_0715.csv',index_col=None)
+    app = DjangoDash('app_subtype',external_stylesheets=[dbc.themes.BOOTSTRAP])
+    app.layout = html.Div([
+    dcc.Input(id='filter-query-input', debounce=True, placeholder='Enter filter query     "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and..."',style={'width':'1000px'} ),
+    dash_table.DataTable(
+          id='datatable-interactivity',
+          columns=[
+            {"name": i, "id": i, "deletable": False, "selectable": True,"hideable":True} for i in df_subtype.columns
+            ],
+          data=df_subtype.to_dict('records'),
+          editable=True,
+          filter_action="native",
+          sort_action="native",
+          sort_mode="multi",
+          row_deletable=True,
+          page_action="native",
+          page_current= 0,
+          page_size= 25,
+          hidden_columns=[],
+          export_format='xlsx',export_headers='display',merge_duplicate_headers=True,
+          style_table={'overflowX': 'auto'},
+         style_cell={'textOverflow': 'ellipsis','font-family':'Helvetica'},style_data_conditional=[{'if': {'row_index': 'odd'},'backgroundColor': 'rgb(220, 220, 220)'}],
+       style_header={'backgroundColor': 'white','color': 'black','fontWeight': 'bold'}
+          ),
+    html.Div(id='datatable-interactivity-container'),
+    dcc.Graph(id="indicator-graphic",config={"displaylogo": False,'toImageButtonOptions': {
+                                                                                       'format': 'svg', 'filename': 'custom_image',
+                                                                                       'height': 700,'width': 1000,'scale': 1 }}),
+    ])
+    @app.callback(
+    Output('datatable-interactivity', 'filter_query'),
+    Input('filter-query-input', 'value')
+    )
+    def write_query(query):
+        if query is None:
+            return ''
+        return query
+    
+    @app.callback(
+    Output('datatable-interactivity-container', "children"),
+    Input('datatable-interactivity', "derived_filter_query_structure"),
+    )
+    @app.callback(
+    Output('indicator-graphic', "figure"),
+    Input('datatable-interactivity', "derived_virtual_data"),
+    )
+    def update_graphs(data):
+        df = pd.DataFrame(data)
+        fig = px.histogram(df, x='FinalSubtype', color = 'FinalSubtype',text_auto=True,height = 800).update_xaxes(categoryorder='total descending')
+        fig.update_layout(
+                      autosize=True,
+                      template="plotly_white",
+                      )
+        return fig
+    context = {}
+    return render(request, 'catalog/subtype.html', context=context)
+@login_required(login_url='/accounts/login/')
 def drug(request):
     lc50 = pd.read_csv('static/Web_Final_LC50.csv')
     app = DjangoDash('app_lc50',external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -335,7 +393,7 @@ def sample_overview(request):
 @login_required(login_url='/accounts/login/')
 def overall (request):
     pid = pd.read_parquet('static/pknumbers.parquet',engine = 'pyarrow')
-    df_plot = pd.read_csv('static/Web_Patient_Final_with_SJ_LC50.csv',index_col=0)
+    df_plot = pd.read_csv('static/Web_Patient_Final_with_SJ_LC50_0404.csv')
     ###lc50 = lc50.drop(columns = ['Unnamed: 0'])
     cnv = pd.read_parquet('static/Web_cnv_del.parquet',engine = 'pyarrow')
     snv = pd.read_parquet('static/Web_snv_fillna.parquet',engine = 'pyarrow')
@@ -853,7 +911,7 @@ def crispr(request):
     app = DjangoDash('app_crispr',external_stylesheets=[dbc.themes.BOOTSTRAP],add_bootstrap_links=True)
     app.layout = html.Div([
         dcc.Input(id='filter-query-input', placeholder='Enter filter query  "Example: {TP53}>8 and {LCK}<12 and {drug} contains DEX and {column_name}=... "',debounce=True,style={'width':'1000px'} ),
-        html.Div([dcc.Dropdown(['6-MP','AraC','Daunorubicin','L-asparaginase','Maphosphamide','Methotrexate','Vincristine','Trametinib','Dasatinib','ALL'],'ALL',id='drug-name',style={'width':'50%'})]),
+        html.Div([dcc.Dropdown(['6-MP','AraC','Daunorubicin','L-asparaginase','Maphosphamide','Methotrexate','Vincristine','Trametinib','Dasatinib','Brequinar','ALL'],'ALL',id='drug-name',style={'width':'50%'})]),
         dash_table.DataTable(
           id='datatable-interactivity',
           columns=[
@@ -904,6 +962,8 @@ def crispr(request):
             df = df[df['Drugs'].str.contains('Dasatinib')]
         elif drug == 'Vincristine':
             df = pd.read_csv('static/CRISPR_Vincristine_REH2.csv',index_col = 0)
+        elif drug == 'Brequinar':
+            df = pd.read_csv('static/CRISPR_Brequinar_Nalm6.csv')
         else:
             df = pd.read_csv('static/CRISPR_ALL_REH.csv',index_col = 0)
 
@@ -1096,8 +1156,8 @@ def image(request):
         aopi2 = pd.DataFrame(aopi2)
         aopi = aopi1['Viability %'] + aopi2['Viability %']
         aopi = round(aopi.mean() / 2,2)
-        cell = (cell1 + cell2 + cell3 + cell4) / 4
-        rsd = (rsd1 + rsd2) / 2 
+        cell = round((cell1 + cell2 + cell3 + cell4) / 4,2)
+        rsd = round((rsd1 + rsd2) / 2,2 )
         σ1 = abs(rsd1 * 3 -100)
         σ2 = abs(rsd2 * 3 -100)
         control = pd.DataFrame(control)
@@ -1113,7 +1173,7 @@ def image(request):
             control_status = 'control_passed' if (top < σ2 and bottom < σ2 ) else 'control_failed'
         filtered_df_drug = df[df['Compound'].str.contains('Control', case=False, regex=False)]
         control = filtered_df_drug['Fail'].astype(int).sum()
-        if control <5 and aopi > 25:
+        if control <5 and aopi > 20:
             if choice == 'DEFAULT':
                 if rsd > 15:
                     res = 'Under Review'
@@ -1123,14 +1183,14 @@ def image(request):
                 res = 'Passed_Reviewed'
             else:
                 res = 'Failed_Reviewed'
-        elif control >6 and aopi > 25:
+        elif control >6 and aopi > 20:
             if choice == 'DEFAULT':
                 res = 'Failed_control'
             elif choice == 'PASS':
                 res = 'Passed_Reviewed'
             else:
                 res = 'Failed_Reviewed'
-        elif control <5 and aopi < 25:
+        elif control <5 and aopi < 20:
             if choice == 'DEFAULT':
                 res = 'Failed_aopi'
             elif choice == 'PASS':
@@ -1194,6 +1254,8 @@ def image(request):
         table2.add_hline()
         for _, row in table2_data.iterrows():
             table2.add_row(row)
+        #for i in range(0,8):
+        #    table2.add_row(('','','',''))
         table2.add_hline()
         table3 = Tabular('|c|c|c|c|')
         table3.add_hline()
@@ -1203,27 +1265,47 @@ def image(request):
             table3.add_row(row)
         if table3_data.shape[0] == 11:
             table3.add_row(('','','',''))
+        #for i in range(0,8):
+        #    table3.add_row(('','','',''))
         table3.add_hline()
+        table4 = Tabular('c c c c c c c c c c c c c c c c c c c c')
+        #table4.add_hline()
+        table4.add_row((MultiColumn(20, align='l',data = 'Staurosporin viability Top: ' + str(top) +'% Bottom: '+ str(bottom)+ '%' + ' ' + '| AOPI Viability %:' + str(aopi) + ' | '+ 'RSD: ' + str(rsd)+ ' | ' + ' Failed Control Well:'+ ' ' + str(control)),))
+        #table4.add_row((MultiColumn(20, align='l',data = 'AOPI Viability %:' + str(aopi) ),))
+        #table4.add_row((MultiColumn(20, align='l',data = 'RSD: ' + str(rsd)+ ' | ' + ' Failed Control Well:'+ ' ' + str(control)),))
+        #table4.add_row((MultiColumn(20, align='l',data = 'Failed Control Well:' + str(control)),))
+        #table4.add_row((MultiColumn(20, align='|l|',data = 'Staurosporin viability Top: ' + str(top) +'% Bottom: '+ str(bottom)+ '%'+ ' '+' '+'AOPI Viability %:' + str(aopi)+ ' ' + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)),))
+        if control <6 and aopi > 25 and control_status == 'control_passed':
+            table4.add_row((MultiColumn(20, align='l',data = 'THIS PLATE HAS PASSED QC RULES'),))
+        else:
+            table4.add_row((MultiColumn(20, align='l',data = 'THIS PLATE HAS NOT PASSED QC RULES'),))
+        #table4.add_hline()
         if rsd > 15 and res !='Passed_Reviewed' and res != 'Failed_Reviewed':
             table_comment = Tabular('|c c c c c c c c c c c c|')
             table_comment.add_hline()
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
             table_comment.add_hline()
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is '+ str(cell)),))
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'AOPI Viability is '+ str(aopi)),))
+            table_comment.add_row('','','','','','','','','','','','')
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'RSD is greater than the threshold of 15%'),))
             if cell > 500:
-                for i in range(0,11):
+                for i in range(0,8):
                     table_comment.add_row('','','','','','','','','','','','')
             else:
                 table_comment.add_row('','','','','','','','','','','','')
-                table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is'),))
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is '),))
                 table_comment.add_row((MultiColumn(12, align='|l|',data = 'less than 500.'),))
-                for i in range(0,8):
+                for i in range(0,5):
                     table_comment.add_row('','','','','','','','','','','','')
         elif res =='Passed_Reviewed' : 
             table_comment = Tabular('|c c c c c c c c c c c c|')
             table_comment.add_hline()
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
             table_comment.add_hline()
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is '+ str(cell)),))
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'AOPI Viability is '+ str(aopi)),))
+            table_comment.add_row('','','','','','','','','','','','')
             if rsd > 15:
                 table_comment.add_row((MultiColumn(12, align='|l|',data = 'RSD is greater than the threshold of 15%'),))
             else:
@@ -1235,19 +1317,22 @@ def image(request):
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'The Pharmacotyping Team has completed'),))
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'its review.'),))
             if cell > 500:
-                for i in range(0,5):
-                    table_comment.add_row('','','','','','','','','','','','')
-            else:
-                table_comment.add_row('','','','','','','','','','','','')
-                table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is'),))
-                table_comment.add_row((MultiColumn(12, align='|l|',data = 'less than 500.'),))
                 for i in range(0,2):
                     table_comment.add_row('','','','','','','','','','','','')
+            else:
+                #table_comment.add_row('','','','','','','','','','','','')
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is'),))
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'less than 500.'),))
+                #for i in range(0,7):
+                #    table_comment.add_row('','','','','','','','','','','','')
         elif res =='Failed_Reviewed' :
             table_comment = Tabular('|c c c c c c c c c c c c|')
             table_comment.add_hline()
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
             table_comment.add_hline()
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is '+ str(cell)),))
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'AOPI Viability is '+ str(aopi)),))
+            table_comment.add_row('','','','','','','','','','','','')
             if rsd > 15:
                 table_comment.add_row((MultiColumn(12, align='|l|',data = 'RSD is greater than the threshold of 15%'),))
             else:
@@ -1259,32 +1344,43 @@ def image(request):
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'The Pharmacotyping Team has completed'),))
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'its review.'),))
             if cell > 500:
-                for i in range(0,5):
-                    table_comment.add_row('','','','','','','','','','','','')
-            else:
-                table_comment.add_row('','','','','','','','','','','','')
-                table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is'),))
-                table_comment.add_row((MultiColumn(12, align='|l|',data = 'less than 500.'),))
                 for i in range(0,2):
                     table_comment.add_row('','','','','','','','','','','','')
+            else:
+                #table_comment.add_row('','','','','','','','','','','','')
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is'),))
+                table_comment.add_row((MultiColumn(12, align='|l|',data = 'less than 500.'),))
+                #for i in range(0,7):
+                #    table_comment.add_row('','','','','','','','','','','','')
         else:
             table_comment = Tabular('|c c c c c c c c c c c c|')
             table_comment.add_hline()
             table_comment.add_row((MultiColumn(12, align='|l|',data = 'Comments:'),))
             table_comment.add_hline()
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is '+ str(cell)),))
+            table_comment.add_row((MultiColumn(12, align='|l|',data = 'AOPI Viability is '+ str(aopi)),))
+            table_comment.add_row('','','','','','','','','','','','')
             if cell > 500:
-                for i in range(0,12):
+                for i in range(0,9):
                     table_comment.add_row('','','','','','','','','','','','')
             else:
-                table_comment.add_row('','','','','','','','','','','','')
+                #table_comment.add_row('','','','','','','','','','','','')
                 table_comment.add_row((MultiColumn(12, align='|l|',data = 'Average # of viable cell in ctrl is'),))
                 table_comment.add_row((MultiColumn(12, align='|l|',data = 'less than 500'),))
-                for i in range(0,9):
+                for i in range(0,7):
                     table_comment.add_row('','','','','','','','','','','','')
         table_comment.add_hline()
         #with doc.create(Section('',numbering=False)):
+        for i in range(0,5):
+            doc.append(LineBreak())
+        doc.append(NoEscape(r'{\large'))
         with doc.create(Tabular('c c c',booktabs=False)) as tables:
             tables.add_row(table2, table3, table_comment)
+        doc.append(NoEscape(r'}'))
+        doc.append(LineBreak())
+        with doc.create(FlushLeft()) as left_align:
+            left_align.append(table4)
+        doc.append(NoEscape(r'\vspace{-1em}'))
         with doc.create(Section('',numbering=False)):
             with doc.create(Figure(position='h!')) as plot:
                 with doc.create(SubFigure(
@@ -1301,21 +1397,21 @@ def image(request):
         with doc.create(Figure(position='h!')) as index_picture:
             with doc.create(SubFigure(position='h!')) as left:
                 left.add_image('/opt/pub/temp/mysite/Index2.PNG', width='240px')
-        with doc.create(Figure(position='h!')) as qc_picture:
-            if res == 'Passed':
-                qc_picture.add_image('/opt/pub/temp/mysite/Passed.png',width='160px')
-            elif res == 'Passed_Reviewed':
-                qc_picture.add_image('/opt/pub/temp/mysite/Passed.png',width='160px')
-            elif res == 'Failed_Reviewed':
-                qc_picture.add_image('/opt/pub/temp/mysite/Failed.png',width='170px')
-            elif res == 'Failed_control':
-                qc_picture.add_image('/opt/pub/temp/mysite/Failed-controlwells.png',width='220px')
-            elif res == 'Failed_aopi':
-                qc_picture.add_image('/opt/pub/temp/mysite/Failed-aopi.png',width='220px')
-            elif res == 'Failed':
-                qc_picture.add_image('/opt/pub/temp/mysite/Failed.png',width='170px')
-            else:
-                qc_picture.add_image('/opt/pub/temp/mysite/Review.png',width='150px')
+        #with doc.create(Figure(position='h!')) as qc_picture:
+        #    if res == 'Passed':
+        #        qc_picture.add_image('/opt/pub/temp/mysite/Passed.png',width='160px')
+        #    elif res == 'Passed_Reviewed':
+        #        qc_picture.add_image('/opt/pub/temp/mysite/Passed.png',width='160px')
+        #    elif res == 'Failed_Reviewed':
+        #        qc_picture.add_image('/opt/pub/temp/mysite/Failed.png',width='170px')
+        #    elif res == 'Failed_control':
+        #        qc_picture.add_image('/opt/pub/temp/mysite/Failed-controlwells.png',width='220px')
+        #    elif res == 'Failed_aopi':
+        #        qc_picture.add_image('/opt/pub/temp/mysite/Failed-aopi.png',width='220px')
+        #    elif res == 'Failed':
+        #        qc_picture.add_image('/opt/pub/temp/mysite/Failed.png',width='170px')
+        #    else:
+        #        qc_picture.add_image('/opt/pub/temp/mysite/Review.png',width='150px')
         pdf_filename = 'output'
         doc.generate_pdf(pdf_filename, clean_tex=True)
         if n_clicks > 0:
@@ -1677,7 +1773,7 @@ def image(request):
         aopi = aopi1['Viability %'] + aopi2['Viability %']
         aopi = round(aopi.mean() / 2,2)
         rsd = round(( float(rsd1) + float(rsd2) ) /2,2)
-        if control <6 and aopi > 25 and control_status == 'control_passed':
+        if control <6 and aopi > 20 and control_status == 'control_passed':
             t = 'Staurosporin viability Top: ' + str(top) +'% Bottom: '+ str(bottom)+ '%'+ '<br>' + 'AOPI Viability %:' + str(aopi)+ ' ' + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' 
         else:
             t = 'Staurosporin viability Top: ' + str(top) +'% Bottom: '+ str(bottom)+ '%' + '<br>' + 'AOPI Viability %:' +str(aopi) + " " + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
@@ -1686,7 +1782,7 @@ def image(request):
         df_plate = df_plate.reset_index(drop=True)
         #df_drug = df_drug.query("Compound != 'Staurosporine'")
         #df = df.query("Compound != 'Staurosporine'")
-        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title= t)
+        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title=t)
         #fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues")
         fig.update_layout( title_x=0.5)
         fig.update_layout( title=dict(font =dict(size= 20)))
@@ -1916,6 +2012,7 @@ def qc2(request):
         table1.add_row((MultiColumn(4,align='||c||', data = ''),))
         table1.add_hline()
         table_user = Tabular(' p{0.33\linewidth} p{0.33\linewidth} p{0.33\linewidth}|')
+        table_user.add_row(('','',''))
         table_user.add_row(('MRN/Plate#: ','Accession: ','Label here '))
         table_user.add_row(('','',''))
         table_user.add_row(('Name: ','QC Date: ',''))
@@ -2398,7 +2495,7 @@ def qc2(request):
         aopi = aopi1['Viability %'] + aopi2['Viability %']
         aopi = round(aopi.mean() / 2,2)
         t = 'AOPI Viability %:' + str(aopi)+ ' ' + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  +'THIS PLATE HAS PASSED QC RULES' if control <6 and aopi > 25  else 'AOPI Viability %:' + str(aopi) + " " + 'RSD: ' + str(rsd) + ' ' + 'Failed Control Well:' + str(control)+ ' '  + 'THIS PLATE HAS NOT PASSED QC RULES'
-        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues",title= t)
+        fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues")
         #fig = px.imshow(df_plate.pivot('Row', 'Column', 'Color'),zmax = 3,zmin = 1,color_continuous_scale="Blues")
         fig.update_layout( title_x=0.5)
         fig.update_layout( title=dict(font =dict(size= 20)))
